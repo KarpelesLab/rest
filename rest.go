@@ -55,7 +55,7 @@ func NewRest(ctx context.Context, req, method string, param map[string]interface
 		Method: method,
 		URL: &url.URL{
 			Scheme: "https",
-			Host:   "ws.atonline.com",
+			Host:   "www.atonline.com",
 			Path:   "/_special/rest/" + req,
 		},
 		Header: make(http.Header),

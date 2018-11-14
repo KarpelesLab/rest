@@ -14,9 +14,9 @@ var (
 
 func systemProxyDirector(req *http.Request) {
 	req.URL.Scheme = "https" // ?
-	req.URL.Host = "ws.atonline.com"
-	req.Host = "ws.atonline.com"
-	req.Header.Set("Host", "ws.atonline.com")
+	req.URL.Host = "www.atonline.com"
+	req.Host = "www.atonline.com"
+	req.Header.Set("Host", "www.atonline.com")
 	req.Header.Set("Sec-Rest-Http", "true")
 	req.Header.Del("Accept-Encoding")
 
