@@ -37,8 +37,8 @@ func (r *RestResponse) ReadValue(ctx context.Context) (interface{}, error) {
 	return v, err
 }
 
-func RestJson(ctx context.Context, req, method string, param map[string]interface{}, target interface{}) error {
-	res, err := NewRest(ctx, req, method, param)
+func Apply(ctx context.Context, req, method string, param map[string]interface{}, target interface{}) error {
+	res, err := Do(ctx, req, method, param)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func RestJson(ctx context.Context, req, method string, param map[string]interfac
 	return err
 }
 
-func NewRest(ctx context.Context, req, method string, param map[string]interface{}) (*RestResponse, error) {
+func Do(ctx context.Context, req, method string, param map[string]interface{}) (*RestResponse, error) {
 	// build http request
 	r := &http.Request{
 		Method: method,
