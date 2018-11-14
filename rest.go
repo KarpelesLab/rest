@@ -37,7 +37,7 @@ func (r *RestResponse) ReadValue(ctx context.Context) (interface{}, error) {
 	return v, err
 }
 
-func Apply(ctx context.Context, req, method string, param map[string]interface{}, target interface{}) error {
+func Apply(ctx context.Context, req, method string, param RestParam, target interface{}) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func Apply(ctx context.Context, req, method string, param map[string]interface{}
 	return err
 }
 
-func Do(ctx context.Context, req, method string, param map[string]interface{}) (*RestResponse, error) {
+func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse, error) {
 	// build http request
 	r := &http.Request{
 		Method: method,
