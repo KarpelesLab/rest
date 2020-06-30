@@ -15,6 +15,8 @@ import (
 	"github.com/MagicalTux/gophp/core/util"
 )
 
+var Debug = false
+
 type RestParam map[string]interface{}
 
 type RestResponse struct {
@@ -43,7 +45,7 @@ func Apply(ctx context.Context, req, method string, param RestParam, target inte
 		return err
 	}
 	err = json.Unmarshal(res.Data, target)
-	if err != nil {
+	if Debug && err != nil {
 		log.Printf("failed to parse json: %s %s", err, res.Data)
 	}
 	return err
@@ -104,14 +106,18 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 	}
 
 	d := time.Since(t)
-	log.Printf("[rest] %s %s => %s", method, req, d)
+	if Debug {
+		log.Printf("[rest] %s %s => %s", method, req, d)
+	}
 
 	//util.CtxPrintf(ctx, "[debug] Response to %s %s: %s", method, req, body)
 
 	result := &RestResponse{}
 	err = json.Unmarshal(body, result)
 	if err != nil {
-		log.Printf("failed to parse json: %s %s", err, body)
+		if Debug {
+			log.Printf("failed to parse json: %s %s", err, body)
+		}
 		return nil, err
 	}
 
