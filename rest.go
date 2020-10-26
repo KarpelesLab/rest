@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/MagicalTux/gophp/core/util"
 )
 
 var Debug = false
@@ -69,7 +67,11 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 	switch method {
 	case "GET", "HEAD", "OPTIONS":
 		// need to pass parameters in GET
-		r.URL.RawQuery = util.EncodePhpQuery(param)
+		data, err := json.Marshal(param)
+		if err != nil {
+			return nil, err
+		}
+		r.URL.RawQuery = "_=" + url.QueryEscape(string(data))
 	case "POST", "PATCH":
 		data, err := json.Marshal(param)
 		if err != nil {
