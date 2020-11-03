@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-var Debug = false
+var (
+	Debug = false
+	Host  = "www.atonline.com"
+)
 
 type RestParam map[string]interface{}
 
@@ -55,7 +58,7 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 		Method: method,
 		URL: &url.URL{
 			Scheme: "https",
-			Host:   "www.atonline.com",
+			Host:   Host,
 			Path:   "/_special/rest/" + req,
 		},
 		Header: make(http.Header),
