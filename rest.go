@@ -101,7 +101,7 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 
 	// check for rest token
 	var token *Token
-	if t, ok := ctx.Value(tokenValue(0)).(*Token); ok {
+	if t, ok := ctx.Value(tokenValue(0)).(*Token); t != nil && ok {
 		// set token & authorization header
 		token = t
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
