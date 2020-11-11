@@ -24,6 +24,8 @@ type RestResponse struct {
 	Result string          `json:"result"` // "success" or "error" (or "redirect")
 	Data   json.RawMessage `json:"data"`
 	Error  string          `json:"error"`
+	Extra  string          `json:"extra"`
+	Token  string          `json:"token"`
 
 	Paging interface{} `json:"paging"`
 	Job    interface{} `json:"job"`
@@ -97,6 +99,14 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 	// final configuration
 	ctx.Value(r)
 
+	// check for rest token
+	var token *Token
+	if t, ok := ctx.Value(tokenValue(0)).(*Token); ok {
+		// set token & authorization header
+		token = t
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	}
+
 	t := time.Now()
 
 	resp, err := RestHttpClient.Do(r)
@@ -110,20 +120,55 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 		return nil, err
 	}
 
-	d := time.Since(t)
-	if Debug {
-		log.Printf("[rest] %s %s => %s", method, req, d)
-	}
-
-	//util.CtxPrintf(ctx, "[debug] Response to %s %s: %s", method, req, body)
+	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, req, body)
 
 	result := &RestResponse{}
 	err = json.Unmarshal(body, result)
 	if err != nil {
 		if Debug {
-			log.Printf("failed to parse json: %s %s", err, body)
+			log.Printf("[rest] failed to parse json: %s %s", err, body)
 		}
 		return nil, err
+	}
+
+	if token != nil && result.Token == "invalid_request_token" && result.Extra == "token_expired" {
+		// token has expired, renew token & re-run process
+		if Debug {
+			log.Printf("[rest] Token has expired, requesting renew")
+		}
+		if err := token.renew(ctx); err != nil {
+			// error
+			if Debug {
+				log.Printf("[rest] failed to renew token: %s", err)
+			}
+			return nil, err
+		}
+
+		// re-run query
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+		resp, err := RestHttpClient.Do(r)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		err = json.Unmarshal(body, result)
+		if err != nil {
+			if Debug {
+				log.Printf("[rest] failed to parse json: %s %s", err, body)
+			}
+			return nil, err
+		}
+	}
+
+	if Debug {
+		d := time.Since(t)
+		log.Printf("[rest] %s %s => %s", method, req, d)
 	}
 
 	if result.Result == "redirect" {
