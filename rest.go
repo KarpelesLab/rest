@@ -18,9 +18,9 @@ var (
 	Host  = "www.atonline.com"
 )
 
-type RestParam map[string]interface{}
+type Param map[string]interface{}
 
-type RestResponse struct {
+type Response struct {
 	Result string          `json:"result"` // "success" or "error" (or "redirect")
 	Data   json.RawMessage `json:"data"`
 	Error  string          `json:"error"`
@@ -36,13 +36,13 @@ type RestResponse struct {
 	RedirectCode int    `json:"redirect_code"`
 }
 
-func (r *RestResponse) ReadValue(ctx context.Context) (interface{}, error) {
+func (r *Response) ReadValue(ctx context.Context) (interface{}, error) {
 	var v interface{}
 	err := json.Unmarshal(r.Data, &v)
 	return v, err
 }
 
-func Apply(ctx context.Context, req, method string, param RestParam, target interface{}) error {
+func Apply(ctx context.Context, req, method string, param Param, target interface{}) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func Apply(ctx context.Context, req, method string, param RestParam, target inte
 	return err
 }
 
-func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse, error) {
+func Do(ctx context.Context, req, method string, param Param) (*Response, error) {
 	// build http request
 	r := &http.Request{
 		Method: method,
@@ -111,7 +111,7 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 
 	resp, err := RestHttpClient.Do(r)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to run rest query: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -122,7 +122,7 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 
 	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, req, body)
 
-	result := &RestResponse{}
+	result := &Response{}
 	err = json.Unmarshal(body, result)
 	if err != nil {
 		if Debug {
@@ -180,7 +180,7 @@ func Do(ctx context.Context, req, method string, param RestParam) (*RestResponse
 	}
 
 	if result.Result == "error" {
-		return nil, fmt.Errorf("[rest] error from server: %s", result.Error)
+		return nil, &Error{result}
 	}
 
 	return result, nil
