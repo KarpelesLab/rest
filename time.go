@@ -1,26 +1,42 @@
 package rest
 
 import (
-	"strconv"
+	"encoding/json"
 	"time"
 )
 
 type Time struct {
-	Full string `json:"full"`
-	TZ   string `json:"tz"`
-	// ignored fields: unix, us, iso
+	time.Time
 }
 
-func (t *Time) Time() time.Time {
-	// need to generate time object
-	v, err := strconv.ParseInt(t.Full, 10, 64)
-	if err != nil {
-		// failed
-		return time.Time{}
+type timestampInternal struct {
+	Unix int64  `json:"unix"` // 1597242491
+	Usec int64  `json:"us"`   // 747497
+	TZ   string `json:"tz"`   // Asia/Tokyo
+	// iso="2020-08-12 23:28:11.747497"
+	// full="1597242491747497"
+	// unixms="1597242491747"
+}
+
+func (u *Time) UnmarshalJSON(data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
 	}
+	var sd timestampInternal
+	err := json.Unmarshal(data, &sd)
+	if err != nil {
+		return err
+	}
+	u.Time = time.Unix(sd.Unix, sd.Usec*1000) // *1000 means µs → ns
+	return nil
+}
 
-	unix := v / 1000000
-	unix_us := v - (unix * 1000000)
+func (u Time) MarshalJSON() ([]byte, error) {
+	var sd timestampInternal
+	sd.Unix = u.Unix()
+	sd.Usec = int64(u.Nanosecond() / 1000)
+	sd.TZ = u.Location().String()
 
-	return time.Unix(unix, unix_us*1000)
+	return json.Marshal(sd)
 }
