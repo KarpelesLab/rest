@@ -10,9 +10,9 @@ type Time struct {
 }
 
 type timestampInternal struct {
-	Unix int64  `json:"unix"` // 1597242491
-	Usec int64  `json:"us"`   // 747497
-	TZ   string `json:"tz"`   // Asia/Tokyo
+	Unix int64  `json:"unix"`         // 1597242491
+	Usec int64  `json:"us"`           // 747497
+	TZ   string `json:"tz,omitempty"` // Asia/Tokyo
 	// iso="2020-08-12 23:28:11.747497"
 	// full="1597242491747497"
 	// unixms="1597242491747"
