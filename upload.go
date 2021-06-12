@@ -14,6 +14,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -35,6 +36,7 @@ type UploadInfo struct {
 
 	awsuploadid string // used during upload
 	awstags     []string
+	awstagsLk   sync.Mutex
 }
 
 type uploadAuth struct {
@@ -201,11 +203,10 @@ func (u *UploadInfo) awsUpload(f io.Reader, mimeType string) (*Response, error) 
 
 	eof := false
 	for !eof {
-		nwg.Wait(u.ParallelUploads)
+		nwg.Wait(u.ParallelUploads - 1)
 		partNo += 1
 
 		readCh := make(chan error)
-		u.awstags = append(u.awstags, "")
 
 		nwg.Add(1)
 		go u.awsUploadPart(f, partNo, readCh, errCh, nwg)
@@ -280,8 +281,12 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 
 	// maxLen in MB
 	maxLen := int64(partNo * 64)
-	if maxLen > 1024 {
-		maxLen = 1024
+	if maxLen > u.MaxPartSize {
+		maxLen = u.MaxPartSize
+	}
+	if maxLen < 5 {
+		// minimum size enforced by aws (except for last part)
+		maxLen = 5
 	}
 
 	tmpf, err := ioutil.TempFile("", "upload*.bin")
@@ -304,6 +309,9 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 			return
 		}
 		readCh <- err
+		if n == 0 {
+			return
+		}
 	} else if n == 0 {
 		// no data to upload, just return EOF
 		readCh <- io.EOF
@@ -333,7 +341,26 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 	}
 
 	// store etag value
-	u.awstags[partNo-1] = resp.Header.Get("Etag")
+	u.setTag(partNo, resp.Header.Get("Etag"))
+}
+
+func (u *UploadInfo) setTag(partNo int, tag string) {
+	u.awstagsLk.Lock()
+	defer u.awstagsLk.Unlock()
+
+	pos := partNo - 1
+
+	if cap(u.awstags) <= pos {
+		// need to increase cap
+		tmp := make([]string, len(u.awstags), cap(u.awstags)+64)
+		copy(tmp, u.awstags)
+		u.awstags = tmp
+	}
+
+	if pos >= len(u.awstags) {
+		u.awstags = u.awstags[:pos+1]
+	}
+	u.awstags[pos] = tag
 }
 
 func (u *UploadInfo) awsAbort() error {
@@ -473,8 +500,9 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		resp.Body.Close()
-		return nil, fmt.Errorf("request failed: %s", resp.Status)
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("request failed: %s\ndetails: %s", resp.Status, body)
 	}
 	return resp, err
 }
