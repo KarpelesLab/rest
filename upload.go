@@ -48,12 +48,12 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 
 	err := Apply(ctx, req, method, param, &upinfo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initial upload query failed: %w", err)
 	}
 
 	up, err := PrepareUpload(upinfo)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("upload prepare failed: %w", err)
 	}
 
 	ln := int64(-1)
