@@ -115,7 +115,7 @@ func (u *UploadInfo) parse(req map[string]interface{}) error {
 	return nil
 }
 
-func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) error {
+func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
 	if u.awsid != "" {
 		if ln == -1 || ln > 64*1024*1024 {
 			return u.awsUpload(ctx, f, mimeType)
@@ -123,13 +123,13 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	}
 
 	if ln == -1 || ln > 5*1024*1024*1024 {
-		return errors.New("cannot upload using PUT method without a known length of less than 5GB")
+		return nil, errors.New("cannot upload using PUT method without a known length of less than 5GB")
 	}
 
 	// we can use simple PUT
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.put, f)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req.ContentLength = ln
@@ -137,7 +137,7 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close() // avoid leaking stuff
 	// read full response, discard (ensures upload completed)
@@ -146,16 +146,15 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	return u.complete(ctx)
 }
 
-func (u *UploadInfo) complete(ctx context.Context) error {
-	_, err := Do(ctx, u.cmpl, "POST", map[string]interface{}{})
-	return err
+func (u *UploadInfo) complete(ctx context.Context) (*Response, error) {
+	return Do(ctx, u.cmpl, "POST", map[string]interface{}{})
 }
 
-func (u *UploadInfo) awsUpload(ctx context.Context, f io.Reader, mimeType string) error {
+func (u *UploadInfo) awsUpload(ctx context.Context, f io.Reader, mimeType string) (*Response, error) {
 	// awsUpload is a magic method that does not need to know upload length as it will split file into manageable sized pieces.
 	err := u.awsInit(ctx, mimeType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// let's upload
@@ -171,13 +170,13 @@ func (u *UploadInfo) awsUpload(ctx context.Context, f io.Reader, mimeType string
 			}
 			// another error → give up
 			u.awsAbort(ctx)
-			return err
+			return nil, err
 		}
 	}
 
 	err = u.awsFinalize(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return u.complete(ctx)
