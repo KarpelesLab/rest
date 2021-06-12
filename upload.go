@@ -77,7 +77,7 @@ func PrepareUpload(req map[string]interface{}) (*UploadInfo, error) {
 	// we have the following parameters:
 	// * PUT (url to put to)
 	// * Complete (APÏ to call upon completion)
-	// we will need to support multipart upload for images over 5GB but this turns out to be fairly complex, and won't be needed after we switch away from S3.
+	// we optionally support multipart upload for images over 5GB through extra parameters
 
 	up := &UploadInfo{}
 	if err := up.parse(req); err != nil {
