@@ -43,6 +43,35 @@ type uploadAwsResp struct {
 	UploadId string
 }
 
+func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
+	var upinfo map[string]interface{}
+
+	err := Apply(ctx, req, method, param, &upinfo)
+	if err != nil {
+		return nil, err
+	}
+
+	up, err := PrepareUpload(upinfo)
+	if err != nil {
+		return nil, err
+	}
+
+	ln := int64(-1)
+
+	if fs, ok := f.(io.Seeker); ok {
+		ln, err = fs.Seek(0, io.SeekEnd)
+		if err != nil {
+			// seek failed, let's continue in the unknown
+			ln = -1
+		} else {
+			// seek back to the start
+			fs.Seek(0, io.SeekStart)
+		}
+	}
+
+	return up.Do(ctx, f, mimeType, ln)
+}
+
 // upload for platform files
 func PrepareUpload(req map[string]interface{}) (*UploadInfo, error) {
 	// we have the following parameters:
