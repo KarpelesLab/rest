@@ -21,6 +21,10 @@ type UploadInfo struct {
 	// generic
 	put  string
 	cmpl string
+	ctx  context.Context
+
+	MaxPartSize     int64 // maximum size of a single part in MB, defaults to 1024 (1GB)
+	ParallelUploads int   // number of parallel uploads to perform (defaults to 3)
 
 	// aws upload
 	awsid     string
@@ -79,7 +83,10 @@ func PrepareUpload(req map[string]interface{}) (*UploadInfo, error) {
 	// * Complete (APÏ to call upon completion)
 	// we optionally support multipart upload for images over 5GB through extra parameters
 
-	up := &UploadInfo{}
+	up := &UploadInfo{
+		MaxPartSize:     1024,
+		ParallelUploads: 3,
+	}
 	if err := up.parse(req); err != nil {
 		return nil, err
 	}
@@ -145,9 +152,10 @@ func (u *UploadInfo) parse(req map[string]interface{}) error {
 }
 
 func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
+	u.ctx = ctx
 	if u.awsid != "" {
 		if ln == -1 || ln > 64*1024*1024 {
-			return u.awsUpload(ctx, f, mimeType)
+			return u.awsUpload(f, mimeType)
 		}
 	}
 
@@ -172,46 +180,81 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	// read full response, discard (ensures upload completed)
 	io.Copy(ioutil.Discard, resp.Body)
 
-	return u.complete(ctx)
+	return u.complete()
 }
 
-func (u *UploadInfo) complete(ctx context.Context) (*Response, error) {
-	return Do(ctx, u.cmpl, "POST", map[string]interface{}{})
+func (u *UploadInfo) complete() (*Response, error) {
+	return Do(u.ctx, u.cmpl, "POST", map[string]interface{}{})
 }
 
-func (u *UploadInfo) awsUpload(ctx context.Context, f io.Reader, mimeType string) (*Response, error) {
+func (u *UploadInfo) awsUpload(f io.Reader, mimeType string) (*Response, error) {
 	// awsUpload is a magic method that does not need to know upload length as it will split file into manageable sized pieces.
-	err := u.awsInit(ctx, mimeType)
+	err := u.awsInit(mimeType)
 	if err != nil {
 		return nil, err
 	}
 
 	// let's upload
 	partNo := 0
+	errCh := make(chan error, 2) // enough just in case
+	nwg := newNWG()
 
-	for {
+	eof := false
+	for !eof {
+		nwg.Wait(u.ParallelUploads)
 		partNo += 1
-		err = u.awsUploadPart(ctx, f, partNo)
-		if err != nil {
+
+		readCh := make(chan error)
+		u.awstags = append(u.awstags, "")
+
+		nwg.Add(1)
+		go u.awsUploadPart(f, partNo, readCh, errCh, nwg)
+
+		select {
+		case err := <-readCh:
 			if err == io.EOF {
-				// completed
-				break
+				eof = true
+			} else if err != nil {
+				// fatal error, give up
+				u.awsAbort()
+				return nil, err
 			}
-			// another error → give up
-			u.awsAbort(ctx)
+		case err := <-errCh:
+			// fatal error, give up
+			u.awsAbort()
 			return nil, err
 		}
 	}
 
-	err = u.awsFinalize(ctx)
+	// wait for nwg completion
+	go func() {
+		nwg.Wait(0)
+		// send "no error"
+		select {
+		case errCh <- nil:
+		default:
+			// do not wait if send fails
+		}
+	}()
+
+	// read & check error (cause waiting for completion)
+	err = <-errCh
+	if err != nil {
+		// fatal error
+		u.awsAbort()
+		return nil, err
+	}
+
+	// finalize
+	err = u.awsFinalize()
 	if err != nil {
 		return nil, err
 	}
 
-	return u.complete(ctx)
+	return u.complete()
 }
 
-func (u *UploadInfo) awsFinalize(ctx context.Context) error {
+func (u *UploadInfo) awsFinalize() error {
 	// see https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadComplete.html
 	buf := &bytes.Buffer{}
 
@@ -221,7 +264,7 @@ func (u *UploadInfo) awsFinalize(ctx context.Context) error {
 	}
 	fmt.Fprintf(buf, "</CompleteMultipartUpload>")
 
-	resp, err := u.awsReq(ctx, "POST", "uploadId="+u.awsuploadid, bytes.NewReader(buf.Bytes()), http.Header{"Content-Type": []string{"text/xml"}})
+	resp, err := u.awsReq("POST", "uploadId="+u.awsuploadid, bytes.NewReader(buf.Bytes()), http.Header{"Content-Type": []string{"text/xml"}})
 	if err != nil {
 		return err
 	}
@@ -231,8 +274,9 @@ func (u *UploadInfo) awsFinalize(ctx context.Context) error {
 	return err
 }
 
-func (u *UploadInfo) awsUploadPart(ctx context.Context, f io.Reader, partNo int) error {
+func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<- error, nwg *numeralWaitGroup) {
 	// prepare to upload a part
+	defer nwg.Done()
 
 	// maxLen in MB
 	maxLen := int64(partNo * 64)
@@ -242,7 +286,9 @@ func (u *UploadInfo) awsUploadPart(ctx context.Context, f io.Reader, partNo int)
 
 	tmpf, err := ioutil.TempFile("", "upload*.bin")
 	if err != nil {
-		return err
+		// failed to create temp file
+		readCh <- err
+		return
 	}
 	// cleanup
 	defer func() {
@@ -250,42 +296,48 @@ func (u *UploadInfo) awsUploadPart(ctx context.Context, f io.Reader, partNo int)
 		os.Remove(tmpf.Name())
 	}()
 
-	eof := false
 	n, err := io.CopyN(tmpf, f, maxLen*1024*1024)
 	if err != nil {
-		if err == io.EOF {
-			eof = true
-		} else {
-			return err
+		if err != io.EOF {
+			// fatal error
+			errCh <- err
+			return
 		}
-	}
-	if n == 0 {
+		readCh <- err
+	} else if n == 0 {
 		// no data to upload, just return EOF
-		return io.EOF
+		readCh <- io.EOF
+		return
+	} else {
+		// end of read
+		readCh <- nil
 	}
 
 	// need to upload to aws
-	resp, err := u.awsReq(ctx, "PUT", fmt.Sprintf("partNumber=%d&uploadId=%s", partNo, u.awsuploadid), tmpf, nil)
+	resp, err := u.awsReq("PUT", fmt.Sprintf("partNumber=%d&uploadId=%s", partNo, u.awsuploadid), tmpf, nil)
 	if err != nil {
-		return err
+		select {
+		case errCh <- err:
+		default:
+		}
+		return
 	}
 	defer resp.Body.Close()
 	_, err = io.Copy(ioutil.Discard, resp.Body)
 	if err != nil {
-		return err
+		select {
+		case errCh <- err:
+		default:
+		}
+		return
 	}
 
 	// store etag value
-	u.awstags = append(u.awstags, resp.Header.Get("Etag"))
-
-	if eof {
-		return io.EOF
-	}
-	return nil
+	u.awstags[partNo-1] = resp.Header.Get("Etag")
 }
 
-func (u *UploadInfo) awsAbort(ctx context.Context) error {
-	resp, err := u.awsReq(ctx, "DELETE", "uploadId="+u.awsuploadid, nil, nil)
+func (u *UploadInfo) awsAbort() error {
+	resp, err := u.awsReq("DELETE", "uploadId="+u.awsuploadid, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -294,9 +346,9 @@ func (u *UploadInfo) awsAbort(ctx context.Context) error {
 	return err
 }
 
-func (u *UploadInfo) awsInit(ctx context.Context, mimeType string) error {
+func (u *UploadInfo) awsInit(mimeType string) error {
 	// see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html
-	resp, err := u.awsReq(ctx, "POST", "uploads=", nil, http.Header{"Content-Type": []string{mimeType}, "X-Amz-Acl": []string{"private"}})
+	resp, err := u.awsReq("POST", "uploads=", nil, http.Header{"Content-Type": []string{mimeType}, "X-Amz-Acl": []string{"private"}})
 	if err != nil {
 		return err
 	}
@@ -318,7 +370,7 @@ func (u *UploadInfo) awsInit(ctx context.Context, mimeType string) error {
 	return nil
 }
 
-func (u *UploadInfo) awsReq(ctx context.Context, method, query string, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
+func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers http.Header) (*http.Response, error) {
 	if headers == nil {
 		headers = http.Header{}
 	}
@@ -391,7 +443,7 @@ func (u *UploadInfo) awsReq(ctx context.Context, method, query string, body io.R
 
 	// generate signature
 	auth := &uploadAuth{}
-	err := Apply(ctx, "Cloud/Aws/Bucket/Upload/"+u.awsid+":signV4", "POST", Param{"headers": strings.Join(awsAuthStr, "\n")}, auth)
+	err := Apply(u.ctx, "Cloud/Aws/Bucket/Upload/"+u.awsid+":signV4", "POST", Param{"headers": strings.Join(awsAuthStr, "\n")}, auth)
 	if err != nil {
 		return nil, err
 	}
@@ -402,7 +454,7 @@ func (u *UploadInfo) awsReq(ctx context.Context, method, query string, body io.R
 	if query != "" {
 		target += "?" + query
 	}
-	req, err := http.NewRequestWithContext(ctx, method, target, body)
+	req, err := http.NewRequestWithContext(u.ctx, method, target, body)
 	if err != nil {
 		return nil, err
 	}
