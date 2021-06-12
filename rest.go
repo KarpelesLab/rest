@@ -42,6 +42,10 @@ func (r *Response) ReadValue(ctx context.Context) (interface{}, error) {
 	return v, err
 }
 
+func (r *Response) Apply(v interface{}) error {
+	return json.Unmarshal(r.Data, v)
+}
+
 func Apply(ctx context.Context, req, method string, param Param, target interface{}) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
