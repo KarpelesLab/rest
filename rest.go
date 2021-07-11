@@ -22,18 +22,18 @@ type Param map[string]interface{}
 
 type Response struct {
 	Result string          `json:"result"` // "success" or "error" (or "redirect")
-	Data   json.RawMessage `json:"data"`
-	Error  string          `json:"error"`
-	Extra  string          `json:"extra"`
-	Token  string          `json:"token"`
+	Data   json.RawMessage `json:"data,omitempty"`
+	Error  string          `json:"error,omitempty"`
+	Extra  string          `json:"extra,omitempty"`
+	Token  string          `json:"token,omitempty"`
 
-	Paging interface{} `json:"paging"`
-	Job    interface{} `json:"job"`
-	Time   interface{} `json:"time"`
-	Access interface{} `json:"access"`
+	Paging interface{} `json:"paging,omitempty"`
+	Job    interface{} `json:"job,omitempty"`
+	Time   interface{} `json:"time,omitempty"`
+	Access interface{} `json:"access,omitempty"`
 
-	RedirectUrl  string `json:"redirect_url"`
-	RedirectCode int    `json:"redirect_code"`
+	RedirectUrl  string `json:"redirect_url,omitempty"`
+	RedirectCode int    `json:"redirect_code,omitempty"`
 }
 
 func (r *Response) ReadValue(ctx context.Context) (interface{}, error) {
@@ -81,7 +81,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 			return nil, err
 		}
 		r.URL.RawQuery = "_=" + url.QueryEscape(string(data))
-	case "POST", "PATCH":
+	case "PUT", "POST", "PATCH":
 		data, err := json.Marshal(param)
 		if err != nil {
 			return nil, err
