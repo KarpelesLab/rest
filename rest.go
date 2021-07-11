@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/KarpelesLab/webutil"
 )
 
 var (
@@ -180,7 +182,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 		if err != nil {
 			return nil, err
 		}
-		return nil, RedirectErrorCode(url, result.RedirectCode)
+		return nil, webutil.RedirectErrorCode(url, result.RedirectCode)
 	}
 
 	if result.Result == "error" {
