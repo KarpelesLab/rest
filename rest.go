@@ -20,34 +20,6 @@ var (
 	Host  = "www.atonline.com"
 )
 
-type Param map[string]interface{}
-
-type Response struct {
-	Result string          `json:"result"` // "success" or "error" (or "redirect")
-	Data   json.RawMessage `json:"data,omitempty"`
-	Error  string          `json:"error,omitempty"`
-	Extra  string          `json:"extra,omitempty"`
-	Token  string          `json:"token,omitempty"`
-
-	Paging interface{} `json:"paging,omitempty"`
-	Job    interface{} `json:"job,omitempty"`
-	Time   interface{} `json:"time,omitempty"`
-	Access interface{} `json:"access,omitempty"`
-
-	RedirectUrl  string `json:"redirect_url,omitempty"`
-	RedirectCode int    `json:"redirect_code,omitempty"`
-}
-
-func (r *Response) ReadValue(ctx context.Context) (interface{}, error) {
-	var v interface{}
-	err := json.Unmarshal(r.Data, &v)
-	return v, err
-}
-
-func (r *Response) Apply(v interface{}) error {
-	return json.Unmarshal(r.Data, v)
-}
-
 func Apply(ctx context.Context, req, method string, param Param, target interface{}) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
