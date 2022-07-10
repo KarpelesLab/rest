@@ -15,6 +15,7 @@ type Response struct {
 	Result string          `json:"result"` // "success" or "error" (or "redirect")
 	Data   json.RawMessage `json:"data,omitempty"`
 	Error  string          `json:"error,omitempty"`
+	Code   int             `json:"code,omitempty"` // for errors
 	Extra  string          `json:"extra,omitempty"`
 	Token  string          `json:"token,omitempty"`
 
