@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	Debug = false
-	Host  = "www.atonline.com"
+	Debug  = false
+	Scheme = "https"
+	Host   = "www.atonline.com"
 )
 
 func Apply(ctx context.Context, req, method string, param Param, target interface{}) error {
@@ -37,7 +38,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	r := &http.Request{
 		Method: method,
 		URL: &url.URL{
-			Scheme: "https",
+			Scheme: Scheme,
 			Host:   Host,
 			Path:   "/_special/rest/" + req,
 		},

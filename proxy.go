@@ -13,7 +13,7 @@ var (
 )
 
 func systemProxyDirector(req *http.Request) {
-	req.URL.Scheme = "https" // ?
+	req.URL.Scheme = Scheme
 	req.URL.Host = Host
 	req.Host = Host
 	req.Header.Set("Host", Host)
