@@ -27,6 +27,9 @@ type UploadInfo struct {
 	MaxPartSize     int64 // maximum size of a single part in MB, defaults to 1024 (1GB)
 	ParallelUploads int   // number of parallel uploads to perform (defaults to 3)
 
+	// put upload
+	blocksize int64
+
 	// aws upload
 	awsid     string
 	awskey    string
@@ -103,6 +106,8 @@ func (u *UploadInfo) String() string {
 func (u *UploadInfo) parse(req map[string]interface{}) error {
 	var ok bool
 
+	//log.Printf("parsing upload response: %+v", req)
+
 	// strict minimum: PUT & Complete
 	u.put, ok = req["PUT"].(string)
 	if !ok {
@@ -125,6 +130,11 @@ func (u *UploadInfo) parse(req map[string]interface{}) error {
 	id, ok := req["Cloud_Aws_Bucket_Upload__"].(string)
 	if !ok {
 		// no id, but we don't care
+		if bs, ok := req["Blocksize"].(float64); ok {
+			// we got a blocksize, this uses the new upload method
+			u.blocksize = int64(bs)
+			return nil
+		}
 		return nil
 	}
 	bucket, ok := req["Bucket_Endpoint"].(map[string]interface{})
@@ -155,6 +165,10 @@ func (u *UploadInfo) parse(req map[string]interface{}) error {
 
 func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
 	u.ctx = ctx
+
+	if u.blocksize > 0 {
+		return u.partUpload(f, mimeType)
+	}
 	if u.awsid != "" {
 		if ln == -1 || ln > 64*1024*1024 {
 			return u.awsUpload(f, mimeType)
@@ -187,6 +201,138 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 
 func (u *UploadInfo) complete() (*Response, error) {
 	return Do(u.ctx, u.cmpl, "POST", map[string]interface{}{})
+}
+
+func (u *UploadInfo) partUpload(f io.Reader, mimeType string) (*Response, error) {
+	// partUpload works similar to awsUpload but when uploading to the new kind of PUT server
+
+	// let's upload
+	partNo := 0
+	errCh := make(chan error, 2) // enough just in case
+	nwg := newNWG()
+
+	eof := false
+	for !eof {
+		nwg.Wait(u.ParallelUploads - 1)
+		partNo += 1
+
+		readCh := make(chan error)
+
+		nwg.Add(1)
+		go u.partUploadPart(f, mimeType, partNo, readCh, errCh, nwg)
+
+		select {
+		case err := <-readCh:
+			if err == io.EOF {
+				eof = true
+			} else if err != nil {
+				// fatal error
+				return nil, err
+			}
+		case err := <-errCh:
+			// fatal error
+			return nil, err
+		}
+	}
+
+	// wait for nwg completion
+	go func() {
+		nwg.Wait(0)
+		// send "no error"
+		select {
+		case errCh <- nil:
+		default:
+			// do not wait if send fails
+		}
+	}()
+
+	// read & check error (cause waiting for completion)
+	err := <-errCh
+	if err != nil {
+		// fatal error
+		return nil, err
+	}
+
+	// finalize
+	return u.complete()
+}
+
+func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, readCh, errCh chan<- error, nwg *numeralWaitGroup) {
+	// prepare to upload a part
+	defer nwg.Done()
+
+	// we use temp files as to avoid using too much memory
+	tmpf, err := ioutil.TempFile("", "upload*.bin")
+	if err != nil {
+		// failed to create temp file
+		readCh <- err
+		return
+	}
+	// cleanup
+	defer func() {
+		tmpf.Close()
+		os.Remove(tmpf.Name())
+	}()
+
+	n, err := io.CopyN(tmpf, f, u.blocksize)
+	if err != nil {
+		if err != io.EOF {
+			// fatal error
+			errCh <- err
+			return
+		}
+		readCh <- err
+		if n == 0 {
+			return
+		}
+	} else if n == 0 {
+		// no data to upload, just return EOF
+		readCh <- io.EOF
+		return
+	} else {
+		// end of read
+		readCh <- nil
+	}
+
+	// rewind tmpf
+	tmpf.Seek(0, io.SeekStart)
+
+	// we can use simple PUT
+	req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, tmpf)
+	if err != nil {
+		select {
+		case errCh <- err:
+		default:
+		}
+		return
+	}
+
+	start := int64(partNo-1) * u.blocksize
+	end := start + n - 1 // inclusive
+
+	req.ContentLength = n // from io.CopyN
+	req.Header.Set("Content-Type", mimeType)
+	req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", start, end))
+
+	// perform upload
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		select {
+		case errCh <- err:
+		default:
+		}
+		return
+	}
+	defer resp.Body.Close() // avoid leaking stuff
+	// read full response, discard (ensures upload completed)
+	_, err = io.Copy(ioutil.Discard, resp.Body)
+	if err != nil {
+		select {
+		case errCh <- err:
+		default:
+		}
+		return
+	}
 }
 
 func (u *UploadInfo) awsUpload(f io.Reader, mimeType string) (*Response, error) {
