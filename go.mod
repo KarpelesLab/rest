@@ -1,5 +1,5 @@
 module github.com/KarpelesLab/rest
 
-go 1.16
+go 1.19
 
-require github.com/KarpelesLab/webutil v0.0.3 // indirect
+require github.com/KarpelesLab/webutil v0.1.0
