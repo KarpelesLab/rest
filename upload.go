@@ -639,6 +639,7 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 		req.ContentLength = ln
 	} else {
 		req.Header.Set("Content-Length", "0")
+		req.TransferEncoding = []string{"identity"}
 	}
 
 	resp, err := http.DefaultClient.Do(req)
