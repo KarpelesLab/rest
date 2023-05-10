@@ -557,6 +557,11 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 			return nil, err
 		}
 		body.Seek(0, io.SeekStart)
+
+		if ln == 0 {
+			// this will allow stupid http.Request to generate the right headers
+			body = bytes.NewReader([]byte{})
+		}
 	}
 
 	// perform aws request using remote signature
@@ -635,12 +640,7 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 		req.Header[k] = v
 	}
 
-	if ln > 0 {
-		req.ContentLength = ln
-	} else {
-		req.Header.Set("Content-Length", "0")
-		req.TransferEncoding = []string{"identity"}
-	}
+	req.ContentLength = ln
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
