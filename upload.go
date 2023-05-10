@@ -455,11 +455,11 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 			return
 		}
 		readCh <- err
-		if n == 0 {
+		if n == 0 && partNo != 1 {
 			return
 		}
-	} else if n == 0 {
-		// no data to upload, just return EOF
+	} else if n == 0 && partNo != 1 {
+		// no data to upload, just return EOF unless we are part #1
 		readCh <- io.EOF
 		return
 	} else {
