@@ -21,7 +21,7 @@ var (
 	Host   = "www.atonline.com"
 )
 
-func Apply(ctx context.Context, req, method string, param Param, target interface{}) error {
+func Apply(ctx context.Context, req, method string, param Param, target any) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
 		return err

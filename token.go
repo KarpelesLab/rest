@@ -25,7 +25,7 @@ var (
 	ErrNoRefreshToken = errors.New("no refresh token is available and access token has expired")
 )
 
-func (w *withToken) Value(v interface{}) interface{} {
+func (w *withToken) Value(v any) any {
 	if _, ok := v.(tokenValue); ok {
 		return w.token
 	}
@@ -48,7 +48,7 @@ func (t *Token) renew(ctx context.Context) error {
 		return ErrNoRefreshToken
 	}
 
-	req := map[string]interface{}{
+	req := map[string]any{
 		"grant_type":    "refresh_token",
 		"client_id":     t.ClientID,
 		"refresh_token": t.RefreshToken,

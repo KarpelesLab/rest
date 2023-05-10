@@ -53,7 +53,7 @@ type uploadAwsResp struct {
 }
 
 func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
-	var upinfo map[string]interface{}
+	var upinfo map[string]any
 
 	err := Apply(ctx, req, method, param, &upinfo)
 	if err != nil {
@@ -82,7 +82,7 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 }
 
 // upload for platform files
-func PrepareUpload(req map[string]interface{}) (*UploadInfo, error) {
+func PrepareUpload(req map[string]any) (*UploadInfo, error) {
 	// we have the following parameters:
 	// * PUT (url to put to)
 	// * Complete (APÏ to call upon completion)
@@ -103,7 +103,7 @@ func (u *UploadInfo) String() string {
 	return u.put
 }
 
-func (u *UploadInfo) parse(req map[string]interface{}) error {
+func (u *UploadInfo) parse(req map[string]any) error {
 	var ok bool
 
 	//log.Printf("parsing upload response: %+v", req)
@@ -137,7 +137,7 @@ func (u *UploadInfo) parse(req map[string]interface{}) error {
 		}
 		return nil
 	}
-	bucket, ok := req["Bucket_Endpoint"].(map[string]interface{})
+	bucket, ok := req["Bucket_Endpoint"].(map[string]any)
 	if !ok {
 		return nil
 	}
@@ -200,7 +200,7 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 }
 
 func (u *UploadInfo) complete() (*Response, error) {
-	return Do(u.ctx, u.cmpl, "POST", map[string]interface{}{})
+	return Do(u.ctx, u.cmpl, "POST", map[string]any{})
 }
 
 func (u *UploadInfo) partUpload(f io.Reader, mimeType string) (*Response, error) {
