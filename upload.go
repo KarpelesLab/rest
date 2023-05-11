@@ -178,6 +178,10 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	if ln == -1 || ln > 5*1024*1024*1024 {
 		return nil, errors.New("cannot upload using PUT method without a known length of less than 5GB")
 	}
+	if ln == 0 {
+		// workaround bug with go http client when ContentLength it set to zero
+		f = bytes.NewReader([]byte{})
+	}
 
 	// we can use simple PUT
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.put, f)
