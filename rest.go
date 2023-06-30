@@ -3,7 +3,6 @@ package rest
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,6 +11,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/KarpelesLab/pjson"
 	"github.com/KarpelesLab/webutil"
 )
 
@@ -26,7 +26,7 @@ func Apply(ctx context.Context, req, method string, param Param, target any) err
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal(res.Data, target)
+	err = pjson.UnmarshalContext(ctx, res.Data, target)
 	if Debug && err != nil {
 		log.Printf("failed to parse json: %s %s", err, res.Data)
 	}
@@ -51,13 +51,13 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	switch method {
 	case "GET", "HEAD", "OPTIONS":
 		// need to pass parameters in GET
-		data, err := json.Marshal(param)
+		data, err := pjson.MarshalContext(ctx, param)
 		if err != nil {
 			return nil, err
 		}
 		r.URL.RawQuery = "_=" + url.QueryEscape(string(data))
 	case "PUT", "POST", "PATCH":
-		data, err := json.Marshal(param)
+		data, err := pjson.MarshalContext(ctx, param)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +102,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, req, body)
 
 	result := &Response{}
-	err = json.Unmarshal(body, result)
+	err = pjson.UnmarshalContext(ctx, body, result)
 	if err != nil {
 		if Debug {
 			log.Printf("[rest] failed to parse json: %s %s", err, body)
@@ -136,7 +136,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 			return nil, err
 		}
 
-		err = json.Unmarshal(body, result)
+		err = pjson.UnmarshalContext(ctx, body, result)
 		if err != nil {
 			if Debug {
 				log.Printf("[rest] failed to parse json: %s %s", err, body)

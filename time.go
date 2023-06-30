@@ -1,8 +1,10 @@
 package rest
 
 import (
-	"encoding/json"
+	"context"
 	"time"
+
+	"github.com/KarpelesLab/pjson"
 )
 
 type Time struct {
@@ -24,7 +26,7 @@ func (u *Time) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var sd timestampInternal
-	err := json.Unmarshal(data, &sd)
+	err := pjson.Unmarshal(data, &sd)
 	if err != nil {
 		return err
 	}
@@ -38,5 +40,28 @@ func (u Time) MarshalJSON() ([]byte, error) {
 	sd.Usec = int64(u.Nanosecond() / 1000)
 	sd.TZ = u.Location().String()
 
-	return json.Marshal(sd)
+	return pjson.Marshal(sd)
+}
+
+func (u *Time) UnmarshalContextJSON(ctx context.Context, data []byte) error {
+	// Ignore null, like in the main JSON package.
+	if string(data) == "null" {
+		return nil
+	}
+	var sd timestampInternal
+	err := pjson.UnmarshalContext(ctx, data, &sd)
+	if err != nil {
+		return err
+	}
+	u.Time = time.Unix(sd.Unix, sd.Usec*1000) // *1000 means µs → ns
+	return nil
+}
+
+func (u Time) MarshalContextJSON(ctx context.Context) ([]byte, error) {
+	var sd timestampInternal
+	sd.Unix = u.Unix()
+	sd.Usec = int64(u.Nanosecond() / 1000)
+	sd.TZ = u.Location().String()
+
+	return pjson.MarshalContext(ctx, sd)
 }

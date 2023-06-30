@@ -2,22 +2,23 @@ package rest
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/fs"
 	"strings"
 	"sync"
+
+	"github.com/KarpelesLab/pjson"
 )
 
 type Param map[string]any
 
 type Response struct {
-	Result string          `json:"result"` // "success" or "error" (or "redirect")
-	Data   json.RawMessage `json:"data,omitempty"`
-	Error  string          `json:"error,omitempty"`
-	Code   int             `json:"code,omitempty"` // for errors
-	Extra  string          `json:"extra,omitempty"`
-	Token  string          `json:"token,omitempty"`
+	Result string           `json:"result"` // "success" or "error" (or "redirect")
+	Data   pjson.RawMessage `json:"data,omitempty"`
+	Error  string           `json:"error,omitempty"`
+	Code   int              `json:"code,omitempty"` // for errors
+	Extra  string           `json:"extra,omitempty"`
+	Token  string           `json:"token,omitempty"`
 
 	Paging any `json:"paging,omitempty"`
 	Job    any `json:"job,omitempty"`
@@ -37,12 +38,23 @@ func (r *Response) ReadValue(ctx context.Context) (any, error) {
 }
 
 func (r *Response) Apply(v any) error {
-	return json.Unmarshal(r.Data, v)
+	return pjson.Unmarshal(r.Data, v)
+}
+
+func (r *Response) ApplyContext(ctx context.Context, v any) error {
+	return pjson.UnmarshalContext(ctx, r.Data, v)
 }
 
 func (r *Response) Value() (any, error) {
 	r.dataParse.Do(func() {
-		r.dataError = json.Unmarshal(r.Data, &r.dataParsed)
+		r.dataError = pjson.Unmarshal(r.Data, &r.dataParsed)
+	})
+	return r.dataParsed, r.dataError
+}
+
+func (r *Response) ValueContext(ctx context.Context) (any, error) {
+	r.dataParse.Do(func() {
+		r.dataError = pjson.UnmarshalContext(ctx, r.Data, &r.dataParsed)
 	})
 	return r.dataParsed, r.dataError
 }
