@@ -34,12 +34,18 @@ func Apply(ctx context.Context, req, method string, param Param, target any) err
 }
 
 func Do(ctx context.Context, req, method string, param Param) (*Response, error) {
+	var backend *url.URL
+	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {
+		backend = bk
+	} else {
+		backend = &url.URL{Scheme: Scheme, Host: Host}
+	}
 	// build http request
 	r := &http.Request{
 		Method: method,
 		URL: &url.URL{
-			Scheme: Scheme,
-			Host:   Host,
+			Scheme: backend.Scheme,
+			Host:   backend.Host,
 			Path:   "/_special/rest/" + req,
 		},
 		Header: make(http.Header),
