@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -28,7 +28,7 @@ func Apply(ctx context.Context, req, method string, param Param, target any) err
 	}
 	err = pjson.UnmarshalContext(ctx, res.Data, target)
 	if Debug && err != nil {
-		log.Printf("failed to parse json: %s %s", err, res.Data)
+		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
 	}
 	return err
 }
@@ -105,7 +105,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	err = pjson.UnmarshalContext(ctx, body, result)
 	if err != nil {
 		if Debug {
-			log.Printf("[rest] failed to parse json: %s %s", err, body)
+			slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
 		}
 		return nil, err
 	}
@@ -113,12 +113,12 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	if token != nil && result.Token == "invalid_request_token" && result.Extra == "token_expired" {
 		// token has expired, renew token & re-run process
 		if Debug {
-			log.Printf("[rest] Token has expired, requesting renew")
+			slog.DebugContext(ctx, "Token has expired, requesting renew", "event", "rest:token_renew")
 		}
 		if err := token.renew(ctx); err != nil {
 			// error
 			if Debug {
-				log.Printf("[rest] failed to renew token: %s", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("failed to renew token: %s", err), "event", "rest:token_renew_fail")
 			}
 			return nil, err
 		}
@@ -139,7 +139,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 		err = pjson.UnmarshalContext(ctx, body, result)
 		if err != nil {
 			if Debug {
-				log.Printf("[rest] failed to parse json: %s %s", err, body)
+				slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
 			}
 			return nil, err
 		}
@@ -147,7 +147,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 
 	if Debug {
 		d := time.Since(t)
-		log.Printf("[rest] %s %s => %s", method, req, d)
+		slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s => %s", method, req, d), "event", "rest:debug_query", "rest:method", method, "rest:request", req, "rest:duration", d)
 	}
 
 	if result.Result == "redirect" {
