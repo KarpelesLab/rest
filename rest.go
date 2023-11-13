@@ -157,6 +157,9 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	}
 
 	if result.Result == "redirect" {
+		if result.Exception == "Exception\\Login" {
+			return nil, ErrLoginRequired
+		}
 		url, err := url.Parse(result.RedirectUrl)
 		if err != nil {
 			return nil, err
@@ -165,7 +168,7 @@ func Do(ctx context.Context, req, method string, param Param) (*Response, error)
 	}
 
 	if result.Result == "error" {
-		return nil, &Error{result}
+		return nil, &Error{Response: result}
 	}
 
 	return result, nil

@@ -25,6 +25,7 @@ type Response struct {
 	Time   any `json:"time,omitempty"`
 	Access any `json:"access,omitempty"`
 
+	Exception    string `json:"exception,omitempty"`
 	RedirectUrl  string `json:"redirect_url,omitempty"`
 	RedirectCode int    `json:"redirect_code,omitempty"`
 
@@ -34,6 +35,11 @@ type Response struct {
 }
 
 func (r *Response) ReadValue(ctx context.Context) (any, error) {
+	return r.Value()
+}
+
+// Raw is implemented as r.Value() for compatibility
+func (r *Response) Raw() (any, error) {
 	return r.Value()
 }
 
