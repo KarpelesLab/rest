@@ -21,7 +21,7 @@ var (
 	Host   = "www.atonline.com"
 )
 
-func Apply(ctx context.Context, req, method string, param Param, target any) error {
+func Apply(ctx context.Context, req, method string, param any, target any) error {
 	res, err := Do(ctx, req, method, param)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func Apply(ctx context.Context, req, method string, param Param, target any) err
 	return err
 }
 
-func Do(ctx context.Context, req, method string, param Param) (*Response, error) {
+func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 	var backend *url.URL
 	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {
 		backend = bk
