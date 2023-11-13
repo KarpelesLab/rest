@@ -152,8 +152,10 @@ func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 	}
 
 	if Debug {
-		d := time.Since(t)
-		slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s => %s", method, req, d), "event", "rest:debug_query", "rest:method", method, "rest:request", req, "rest:duration", d)
+		if v, ok := ctx.Value(SkipDebugLog).(bool); !ok || !v {
+			d := time.Since(t)
+			slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s => %s", method, req, d), "event", "rest:debug_query", "rest:method", method, "rest:request", req, "rest:duration", d)
+		}
 	}
 
 	if result.Result == "redirect" {
