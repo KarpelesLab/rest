@@ -3,6 +3,7 @@ package rest
 import (
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 )
 
 var (
@@ -13,10 +14,15 @@ var (
 )
 
 func systemProxyDirector(req *http.Request) {
-	req.URL.Scheme = Scheme
-	req.URL.Host = Host
-	req.Host = Host
-	req.Header.Set("Host", Host)
+	if bk, ok := req.Context().Value(BackendURL).(*url.URL); ok && bk != nil {
+		req.URL.Scheme = bk.Scheme
+		req.URL.Host = bk.Host
+	} else {
+		req.URL.Scheme = Scheme
+		req.URL.Host = Host
+	}
+	//req.Host = Host
+	req.Header.Set("Host", req.URL.Host)
 	req.Header.Set("Sec-Rest-Http", "true")
 	req.Header.Del("Accept-Encoding")
 
