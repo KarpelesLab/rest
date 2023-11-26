@@ -43,6 +43,50 @@ func (r *Response) Raw() (any, error) {
 	return r.Value()
 }
 
+// FullRaw fetches the whole raw object including "Response" own data
+func (r *Response) FullRaw() (map[string]any, error) {
+	data, err := r.Value()
+	if err != nil {
+		return nil, err
+	}
+	resp := map[string]any{"result": r.Result, "data": data}
+	if r.Error != "" {
+		resp["error"] = r.Error
+	}
+	if r.Code != 0 {
+		resp["code"] = r.Code
+	}
+	if r.Extra != "" {
+		resp["extra"] = r.Extra
+	}
+	if r.Token != "" {
+		resp["token"] = r.Token
+	}
+	if r.Paging != nil {
+		resp["paging"] = r.Paging
+	}
+	if r.Job != nil {
+		resp["job"] = r.Job
+	}
+	if r.Time != nil {
+		resp["time"] = r.Time
+	}
+	if r.Access != nil {
+		resp["access"] = r.Access
+	}
+	if r.Exception != "" {
+		resp["exception"] = r.Exception
+	}
+	if r.RedirectUrl != "" {
+		resp["redirect_url"] = r.RedirectUrl
+	}
+	if r.RedirectCode != 0 {
+		resp["redirect_code"] = r.RedirectCode
+	}
+
+	return resp, nil
+}
+
 func (r *Response) Apply(v any) error {
 	return pjson.Unmarshal(r.Data, v)
 }
