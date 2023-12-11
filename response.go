@@ -38,6 +38,34 @@ func (r *Response) ReadValue(ctx context.Context) (any, error) {
 	return r.Value()
 }
 
+func (r *Response) OffsetGet(ctx context.Context, key string) (any, error) {
+	if strings.HasPrefix(key, "@") {
+		switch key[1:] {
+		case "error":
+			return r.Error, nil
+		case "code":
+			return r.Code, nil
+		case "extra":
+			return r.Extra, nil
+		case "token":
+			return r.Token, nil
+		case "paging":
+			return r.Paging, nil
+		case "job":
+			return r.Job, nil
+		case "time":
+			return r.Time, nil
+		case "access":
+			return r.Access, nil
+		case "exception":
+			return r.Exception, nil
+		}
+	}
+
+	// return value
+	return r.Get(key)
+}
+
 // Raw is implemented as r.Value() for compatibility
 func (r *Response) Raw() (any, error) {
 	return r.Value()
