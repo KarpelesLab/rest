@@ -124,17 +124,17 @@ func (r *Response) ApplyContext(ctx context.Context, v any) error {
 }
 
 func (r *Response) Value() (any, error) {
-	r.dataParse.Do(func() {
-		r.dataError = pjson.Unmarshal(r.Data, &r.dataParsed)
-	})
+	r.dataParse.Do(r.ParseData)
 	return r.dataParsed, r.dataError
 }
 
 func (r *Response) ValueContext(ctx context.Context) (any, error) {
-	r.dataParse.Do(func() {
-		r.dataError = pjson.UnmarshalContext(ctx, r.Data, &r.dataParsed)
-	})
+	r.dataParse.Do(r.ParseData)
 	return r.dataParsed, r.dataError
+}
+
+func (r *Response) ParseData() {
+	r.dataError = pjson.Unmarshal(r.Data, &r.dataParsed)
 }
 
 func (r *Response) Get(v string) (any, error) {
