@@ -149,7 +149,7 @@ func (r *Response) Get(v string) (any, error) {
 			continue
 		}
 		// we assume each sub will be an index in cur as a map
-		cur, err = typutil.GetOffset(cur, sub)
+		cur, err = typutil.OffsetGet(context.Background(), cur, sub)
 		if err != nil {
 			return cur, err
 		}
