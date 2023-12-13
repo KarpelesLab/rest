@@ -3,11 +3,11 @@ package rest
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"strings"
 	"sync"
 
 	"github.com/KarpelesLab/pjson"
+	"github.com/KarpelesLab/typutil"
 )
 
 type Param map[string]any
@@ -149,13 +149,12 @@ func (r *Response) Get(v string) (any, error) {
 			continue
 		}
 		// we assume each sub will be an index in cur as a map
-		curV, ok := cur.(map[string]any)
-		if !ok {
-			return nil, fs.ErrNotExist
+		cur, err = typutil.GetOffset(cur, sub)
+		if err != nil {
+			return cur, err
 		}
-		cur, ok = curV[sub]
-		if !ok {
-			return nil, fs.ErrNotExist
+		if cur == nil {
+			return nil, nil
 		}
 	}
 	return cur, nil
