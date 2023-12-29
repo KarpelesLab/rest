@@ -113,6 +113,10 @@ func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 		if Debug {
 			slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
 		}
+		if resp.StatusCode >= 400 {
+			// this is an error response
+			err = &HttpError{Code: resp.StatusCode, Body: body, e: err}
+		}
 		return nil, err
 	}
 

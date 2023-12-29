@@ -32,3 +32,17 @@ func (r *Error) Unwrap() error {
 		return nil
 	}
 }
+
+type HttpError struct {
+	Code int
+	Body []byte
+	e    error // unwrap error
+}
+
+func (e *HttpError) Error() string {
+	return fmt.Sprintf("HTTP Error %d: %s", e.Code, e.Body)
+}
+
+func (e *HttpError) Unwrap() error {
+	return e.e
+}
