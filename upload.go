@@ -430,14 +430,7 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 	defer nwg.Done()
 
 	// maxLen in MB
-	maxLen := int64(partNo * 64)
-	if maxLen > u.MaxPartSize {
-		maxLen = u.MaxPartSize
-	}
-	if maxLen < 5 {
-		// minimum size enforced by aws (except for last part)
-		maxLen = 5
-	}
+	maxLen := u.MaxPartSize
 
 	tmpf, err := ioutil.TempFile("", "upload*.bin")
 	if err != nil {
