@@ -18,5 +18,5 @@ var RestHttpTransport = &http.Transport{
 
 var RestHttpClient = &http.Client{
 	Transport: RestHttpTransport,
-	Timeout:   120 * time.Second,
+	Timeout:   300 * time.Second,
 }
