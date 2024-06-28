@@ -28,7 +28,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	var p rest.Param
+	var p rest.Param = map[string]any{}
+
 	if param := *params; param != "" {
 		if param[0] == '{' {
 			// json
@@ -58,6 +59,6 @@ func doUpload(fn string, p rest.Param) error {
 	}
 	defer f.Close()
 
-	_, err = rest.Upload(context.Background(), "POST", *api, p, f, mime.TypeByExtension(filepath.Ext(fn)))
+	_, err = rest.Upload(context.Background(), *api, "POST", p, f, mime.TypeByExtension(filepath.Ext(fn)))
 	return err
 }
