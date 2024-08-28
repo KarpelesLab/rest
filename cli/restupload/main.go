@@ -28,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var p rest.Param = map[string]any{}
+	var p rest.Param = make(map[string]any)
 
 	if param := *params; param != "" {
 		if param[0] == '{' {
@@ -59,6 +59,19 @@ func doUpload(fn string, p rest.Param) error {
 	}
 	defer f.Close()
 
-	_, err = rest.Upload(context.Background(), *api, "POST", p, f, mime.TypeByExtension(filepath.Ext(fn)))
+	mimeType := mime.TypeByExtension(filepath.Ext(fn))
+
+	var pCopy rest.Param = make(map[string]any)
+	for k, v := range p {
+		pCopy[k] = v
+	}
+	pCopy["filename"] = filepath.Base(fn)
+	pCopy["type"] = mimeType
+	if st, err := f.Stat(); err == nil {
+		pCopy["size"] = st.Size()
+		pCopy["lastModified"] = st.ModTime().Unix()
+	}
+
+	_, err = rest.Upload(context.Background(), *api, "POST", pCopy, f, mimeType)
 	return err
 }
