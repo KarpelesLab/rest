@@ -21,8 +21,8 @@ var (
 	Host   = "www.atonline.com"
 )
 
-func Apply(ctx context.Context, req, method string, param any, target any) error {
-	res, err := Do(ctx, req, method, param)
+func Apply(ctx context.Context, path, method string, param any, target any) error {
+	res, err := Do(ctx, path, method, param)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func Apply(ctx context.Context, req, method string, param any, target any) error
 	return err
 }
 
-func Do(ctx context.Context, req, method string, param any) (*Response, error) {
+func Do(ctx context.Context, path, method string, param any) (*Response, error) {
 	var backend *url.URL
 	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {
 		backend = bk
@@ -46,7 +46,7 @@ func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 		URL: &url.URL{
 			Scheme: backend.Scheme,
 			Host:   backend.Host,
-			Path:   "/_special/rest/" + req,
+			Path:   "/_special/rest/" + path,
 		},
 		Header: make(http.Header),
 	}
@@ -105,7 +105,7 @@ func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 		return nil, err
 	}
 
-	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, req, body)
+	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, path, body)
 
 	result := &Response{}
 	err = pjson.UnmarshalContext(ctx, body, result)
@@ -158,7 +158,7 @@ func Do(ctx context.Context, req, method string, param any) (*Response, error) {
 	if Debug {
 		if v, ok := ctx.Value(SkipDebugLog).(bool); !ok || !v {
 			d := time.Since(t)
-			slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s => %s", method, req, d), "event", "rest:debug_query", "rest:method", method, "rest:request", req, "rest:duration", d)
+			slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s => %s", method, path, d), "event", "rest:debug_query", "rest:method", method, "rest:request", path, "rest:duration", d)
 		}
 	}
 
