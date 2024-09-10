@@ -1,3 +1,5 @@
+//go:build !wasm
+
 package rest
 
 import "net/http"
