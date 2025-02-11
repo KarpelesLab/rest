@@ -23,6 +23,7 @@ type UploadInfo struct {
 	put  string
 	cmpl string
 	ctx  context.Context
+	spot SpotClient
 
 	MaxPartSize     int64 // maximum size of a single part in MB, defaults to 1024 (1GB)
 	ParallelUploads int   // number of parallel uploads to perform (defaults to 3)
@@ -50,6 +51,37 @@ type uploadAwsResp struct {
 	Bucket   string
 	Key      string
 	UploadId string
+}
+
+func SpotUpload(ctx context.Context, client SpotClient, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
+	var upinfo map[string]any
+
+	err := SpotApply(ctx, client, req, method, param, &upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("initial upload query failed: %w", err)
+	}
+
+	up, err := PrepareUpload(upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("upload prepare failed: %w", err)
+	}
+
+	up.spot = client
+
+	ln := int64(-1)
+
+	if fs, ok := f.(io.Seeker); ok {
+		ln, err = fs.Seek(0, io.SeekEnd)
+		if err != nil {
+			// seek failed, let's continue in the unknown
+			ln = -1
+		} else {
+			// seek back to the start
+			fs.Seek(0, io.SeekStart)
+		}
+	}
+
+	return up.Do(ctx, f, mimeType, ln)
 }
 
 func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
@@ -204,6 +236,9 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 }
 
 func (u *UploadInfo) complete() (*Response, error) {
+	if u.spot != nil {
+		return SpotDo(u.ctx, u.spot, u.cmpl, "POST", map[string]any{})
+	}
 	return Do(u.ctx, u.cmpl, "POST", map[string]any{})
 }
 
