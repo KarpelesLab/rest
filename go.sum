@@ -4,6 +4,8 @@ github.com/KarpelesLab/typutil v0.2.13 h1:9m9drR8aIe2MaNh9hAuM39Zecgx6uvtlVurUOl
 github.com/KarpelesLab/typutil v0.2.13/go.mod h1:lqs248XpjFstgZMT5ZVP4/3B6zT7eEeq5kKj4/tC1IQ=
 github.com/KarpelesLab/typutil v0.2.17 h1:x9dTshRQVeAtVvIN8XhK0PBdMPXEXrvj3B+e+ZFsAEk=
 github.com/KarpelesLab/typutil v0.2.17/go.mod h1:AAFzwyeM5datR6N5pGy8VrihZacfVS4ktC+AKp3VIrQ=
+github.com/KarpelesLab/typutil v0.2.29 h1:lyo+5MAVOxDbZrTeotrhhLY6jfN+CwVrMm8ms/ZYsQc=
+github.com/KarpelesLab/typutil v0.2.29/go.mod h1:AAFzwyeM5datR6N5pGy8VrihZacfVS4ktC+AKp3VIrQ=
 github.com/KarpelesLab/webutil v0.2.1 h1:5mB+mPBj3iRasv9zY9rDAh00yvKQWJxDOjyUZTjfmlY=
 github.com/KarpelesLab/webutil v0.2.1/go.mod h1:AKTsmoimqwSdJHtZzBnvxcjQv3lgyw/GVJFVyXaDilU=
 github.com/KarpelesLab/webutil v0.2.2 h1:FsUwiLAjMDZj9zaSL4hzg2SWgJa9tQzM1A1w15RAGHw=
