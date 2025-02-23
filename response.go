@@ -119,6 +119,12 @@ func (r *Response) Apply(v any) error {
 	return pjson.Unmarshal(r.Data, v)
 }
 
+func ResponseAs[T any](r *Response) (T, error) {
+	var target T
+	err := r.Apply(&target)
+	return target, err
+}
+
 func (r *Response) ApplyContext(ctx context.Context, v any) error {
 	return pjson.UnmarshalContext(ctx, r.Data, v)
 }
