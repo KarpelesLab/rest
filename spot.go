@@ -26,6 +26,19 @@ func SpotApply(ctx context.Context, client SpotClient, path, method string, para
 	return err
 }
 
+func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, param any) (T, error) {
+	var target T
+	res, err := SpotDo(ctx, client, path, method, param)
+	if err != nil {
+		return target, err
+	}
+	err = pjson.UnmarshalContext(ctx, res.Data, &target)
+	if Debug && err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+	}
+	return target, err
+}
+
 func SpotDo(ctx context.Context, client SpotClient, path, method string, param any) (*Response, error) {
 	req := map[string]any{
 		"path":   path,

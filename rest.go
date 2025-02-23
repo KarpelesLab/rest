@@ -33,6 +33,19 @@ func Apply(ctx context.Context, path, method string, param any, target any) erro
 	return err
 }
 
+func As[T any](ctx context.Context, path, method string, param any) (T, error) {
+	var target T
+	res, err := Do(ctx, path, method, param)
+	if err != nil {
+		return target, err
+	}
+	err = pjson.UnmarshalContext(ctx, res.Data, &target)
+	if Debug && err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+	}
+	return target, err
+}
+
 func Do(ctx context.Context, path, method string, param any) (*Response, error) {
 	var backend *url.URL
 	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {
