@@ -60,6 +60,7 @@ type uploadAwsResp struct {
 // This is similar to Upload but uses a specific SpotClient for the request.
 //
 // Parameters:
+//
 // - ctx: Context for the request
 // - client: SpotClient to use for the API request
 // - req: API endpoint path
@@ -105,6 +106,7 @@ func SpotUpload(ctx context.Context, client SpotClient, req, method string, para
 // and server capabilities (direct PUT, multi-part, or AWS S3).
 //
 // Parameters:
+//
 // - ctx: Context for the request
 // - req: API endpoint path
 // - method: HTTP method for the initial API request
@@ -146,6 +148,7 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 // It parses server-provided upload parameters and prepares for the actual upload.
 //
 // Parameters:
+//
 // - req: Map containing upload configuration from the server
 //
 // Returns an UploadInfo object or an error if preparation fails.
@@ -238,6 +241,7 @@ func (u *UploadInfo) parse(req map[string]any) error {
 // based on file size and server capabilities.
 //
 // Parameters:
+//
 // - ctx: Context for the upload request
 // - f: Reader for the file content to upload
 // - mimeType: MIME type of the file content

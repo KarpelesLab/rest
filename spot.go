@@ -19,6 +19,7 @@ type SpotClient interface {
 // This is similar to Apply but uses a SpotClient for the request.
 //
 // Parameters:
+//
 // - ctx: Context for the request
 // - client: SpotClient to use for the API request
 // - path: API endpoint path
@@ -67,6 +68,7 @@ func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, 
 // This is the base function used by SpotApply and SpotAs.
 //
 // Parameters:
+//
 // - ctx: Context for the request
 // - client: SpotClient to use for the API request
 // - path: API endpoint path

@@ -31,6 +31,7 @@ var (
 // It handles authentication, error parsing, and JSON unmarshaling.
 //
 // Parameters:
+//
 // - ctx: Context for the request, may contain authentication tokens
 // - path: API endpoint path
 // - method: HTTP method (GET, POST, PUT, etc.)
@@ -54,6 +55,7 @@ func Apply(ctx context.Context, path, method string, param any, target any) erro
 // This is a generic version of Apply that returns the target object directly.
 //
 // Parameters:
+//
 // - ctx: Context for the request, may contain authentication tokens
 // - path: API endpoint path
 // - method: HTTP method (GET, POST, PUT, etc.)
@@ -77,6 +79,7 @@ func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 // It handles token authentication, token renewal, parameter encoding, and error parsing.
 //
 // Parameters:
+//
 // - ctx: Context for the request, may contain authentication tokens
 // - path: API endpoint path
 // - method: HTTP method (GET, POST, PUT, etc.)
