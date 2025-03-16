@@ -18,6 +18,9 @@ import (
 	"time"
 )
 
+// UploadInfo represents configuration and state for file uploads.
+// It supports different upload methods: direct PUT, multi-part uploads,
+// and AWS S3 uploads for large files.
 type UploadInfo struct {
 	// generic
 	put  string
@@ -53,6 +56,19 @@ type uploadAwsResp struct {
 	UploadId string
 }
 
+// SpotUpload uploads a file using a SpotClient.
+// This is similar to Upload but uses a specific SpotClient for the request.
+//
+// Parameters:
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - req: API endpoint path
+// - method: HTTP method for the initial API request
+// - param: Parameters for the initial API request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+//
+// Returns the API response after upload completion or an error.
 func SpotUpload(ctx context.Context, client SpotClient, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
@@ -84,6 +100,19 @@ func SpotUpload(ctx context.Context, client SpotClient, req, method string, para
 	return up.Do(ctx, f, mimeType, ln)
 }
 
+// Upload uploads a file to a REST API endpoint.
+// It automatically selects the best upload method based on file size
+// and server capabilities (direct PUT, multi-part, or AWS S3).
+//
+// Parameters:
+// - ctx: Context for the request
+// - req: API endpoint path
+// - method: HTTP method for the initial API request
+// - param: Parameters for the initial API request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+//
+// Returns the API response after upload completion or an error.
 func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
@@ -113,7 +142,13 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 	return up.Do(ctx, f, mimeType, ln)
 }
 
-// upload for platform files
+// PrepareUpload creates an UploadInfo from the server response to an upload request.
+// It parses server-provided upload parameters and prepares for the actual upload.
+//
+// Parameters:
+// - req: Map containing upload configuration from the server
+//
+// Returns an UploadInfo object or an error if preparation fails.
 func PrepareUpload(req map[string]any) (*UploadInfo, error) {
 	// we have the following parameters:
 	// * PUT (url to put to)
@@ -131,10 +166,13 @@ func PrepareUpload(req map[string]any) (*UploadInfo, error) {
 	return up, nil
 }
 
+// String returns the upload URL as a string representation of the UploadInfo.
 func (u *UploadInfo) String() string {
 	return u.put
 }
 
+// parse extracts upload configuration from the server response.
+// It handles both standard PUT uploads and AWS S3 multipart uploads.
 func (u *UploadInfo) parse(req map[string]any) error {
 	var ok bool
 
@@ -195,6 +233,17 @@ func (u *UploadInfo) parse(req map[string]any) error {
 	return nil
 }
 
+// Do performs the actual file upload using the appropriate method.
+// It automatically chooses between direct PUT, multi-part, or AWS S3 uploads
+// based on file size and server capabilities.
+//
+// Parameters:
+// - ctx: Context for the upload request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+// - ln: Length of the file in bytes, or -1 if unknown
+//
+// Returns the API response after upload completion or an error.
 func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
 	u.ctx = ctx
 

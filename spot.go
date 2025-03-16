@@ -8,12 +8,25 @@ import (
 	"github.com/KarpelesLab/pjson"
 )
 
-// SpotClient is an interface fullfilled by spotlib.Client that contains
-// everything we really care about, and helps avoid dependency loops
+// SpotClient is an interface fulfilled by spotlib.Client that provides
+// the necessary functionality for making API requests through a Spot connection.
+// Using this interface helps avoid dependency loops between packages.
 type SpotClient interface {
 	Query(ctx context.Context, target string, body []byte) ([]byte, error)
 }
 
+// SpotApply makes a REST API request through a SpotClient and unmarshals the response into target.
+// This is similar to Apply but uses a SpotClient for the request.
+//
+// Parameters:
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+// - target: Destination object for unmarshaled response data
+//
+// Returns an error if the request fails or response cannot be unmarshaled.
 func SpotApply(ctx context.Context, client SpotClient, path, method string, param any, target any) error {
 	res, err := SpotDo(ctx, client, path, method, param)
 	if err != nil {
@@ -26,6 +39,17 @@ func SpotApply(ctx context.Context, client SpotClient, path, method string, para
 	return err
 }
 
+// SpotAs makes a REST API request through a SpotClient and returns the response data unmarshaled into type T.
+// This is a generic version of SpotApply that returns the target object directly.
+//
+// Parameters:
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns the unmarshaled object of type T and any error encountered.
 func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, param any) (T, error) {
 	var target T
 	res, err := SpotDo(ctx, client, path, method, param)
@@ -39,6 +63,17 @@ func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, 
 	return target, err
 }
 
+// SpotDo executes a REST API request through a SpotClient and returns the raw Response object.
+// This is the base function used by SpotApply and SpotAs.
+//
+// Parameters:
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns the raw Response object and any error encountered during the request.
 func SpotDo(ctx context.Context, client SpotClient, path, method string, param any) (*Response, error) {
 	req := map[string]any{
 		"path":   path,

@@ -10,8 +10,11 @@ import (
 	"github.com/KarpelesLab/typutil"
 )
 
+// Param is a convenience type for parameters passed to REST API requests.
 type Param map[string]any
 
+// Response represents a REST API response with standard fields.
+// It handles different result types and provides methods to access response data.
 type Response struct {
 	Result string           `json:"result"` // "success" or "error" (or "redirect")
 	Data   pjson.RawMessage `json:"data,omitempty"`
@@ -34,10 +37,15 @@ type Response struct {
 	dataParse  sync.Once
 }
 
+// ReadValue returns the parsed data from the response.
+// It's an alias for Value() that satisfies interfaces requiring a context parameter.
 func (r *Response) ReadValue(ctx context.Context) (any, error) {
 	return r.Value()
 }
 
+// OffsetGet implements the typutil.Getter interface for Response objects.
+// It allows accessing response fields by key, with special handling for metadata keys
+// prefixed with '@' (e.g., @error, @code).
 func (r *Response) OffsetGet(ctx context.Context, key string) (any, error) {
 	if strings.HasPrefix(key, "@") {
 		switch key[1:] {
@@ -66,12 +74,14 @@ func (r *Response) OffsetGet(ctx context.Context, key string) (any, error) {
 	return r.Get(key)
 }
 
-// Raw is implemented as r.Value() for compatibility
+// Raw returns the parsed data from the response.
+// It's implemented as r.Value() for compatibility with older code.
 func (r *Response) Raw() (any, error) {
 	return r.Value()
 }
 
-// FullRaw fetches the whole raw object including "Response" own data
+// FullRaw returns the complete response as a map, including both the data payload
+// and all metadata fields (result, error, code, etc.).
 func (r *Response) FullRaw() (map[string]any, error) {
 	data, err := r.Value()
 	if err != nil {

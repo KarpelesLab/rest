@@ -1,3 +1,6 @@
+// Package rest provides a client for interacting with RESTful API services.
+// It simplifies making HTTP requests to REST endpoints, handling authentication,
+// token renewal, and response parsing.
 package rest
 
 import (
@@ -16,11 +19,25 @@ import (
 )
 
 var (
+	// Debug enables verbose logging of REST API requests and responses
 	Debug  = false
+	// Scheme defines the URL scheme for API requests (http or https)
 	Scheme = "https"
+	// Host defines the default hostname for API requests
 	Host   = "www.atonline.com"
 )
 
+// Apply makes a REST API request and unmarshals the response data into the target object.
+// It handles authentication, error parsing, and JSON unmarshaling.
+//
+// Parameters:
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+// - target: Destination object for unmarshaled response data
+//
+// Returns an error if the request fails or response cannot be unmarshaled.
 func Apply(ctx context.Context, path, method string, param any, target any) error {
 	res, err := Do(ctx, path, method, param)
 	if err != nil {
@@ -33,6 +50,16 @@ func Apply(ctx context.Context, path, method string, param any, target any) erro
 	return err
 }
 
+// As makes a REST API request and returns the response data unmarshaled into the specified type T.
+// This is a generic version of Apply that returns the target object directly.
+//
+// Parameters:
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns the unmarshaled object of type T and any error encountered.
 func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 	var target T
 	res, err := Do(ctx, path, method, param)
@@ -46,6 +73,16 @@ func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 	return target, err
 }
 
+// Do executes a REST API request and returns the raw Response object.
+// It handles token authentication, token renewal, parameter encoding, and error parsing.
+//
+// Parameters:
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns the raw Response object and any error encountered during the request.
 func Do(ctx context.Context, path, method string, param any) (*Response, error) {
 	var backend *url.URL
 	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {
