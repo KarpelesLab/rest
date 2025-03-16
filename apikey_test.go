@@ -10,34 +10,48 @@ import (
 	"time"
 )
 
-// TestNewApiKey verifies the API key loading function.
-func TestNewApiKey(t *testing.T) {
-	// Read the API key file to use a real key for testing
+// loadTestApiKey is a helper function that loads the API key from api.txt for testing.
+// It returns the API key or skips the test if the file is missing or invalid.
+func loadTestApiKey(t *testing.T) (*ApiKey, string, string) {
+	t.Helper()
+
+	// Read the API key file
 	data, err := os.ReadFile("api.txt")
 	if err != nil {
 		t.Skipf("Skipping test, could not read API key file: %v", err)
-		return
+		return nil, "", ""
 	}
 
 	// Parse the key and secret from the file
 	parts := strings.SplitN(strings.TrimSpace(string(data)), ":", 2)
 	if len(parts) != 2 {
 		t.Skipf("Skipping test, API key file has invalid format")
-		return
+		return nil, "", ""
 	}
 
-	testKeyID := parts[0]
-	testSecret := parts[1]
+	keyID := parts[0]
+	secret := parts[1] // Secret is already base64-encoded in the file
 
-	// Test with the real key
-	apiKey, err := NewApiKey(testKeyID, testSecret)
+	// Load the API key
+	apiKey, err := NewApiKey(keyID, secret)
 	if err != nil {
 		t.Fatalf("Failed to load API key: %v", err)
 	}
 
+	return apiKey, keyID, secret
+}
+
+// TestNewApiKey verifies the API key loading function.
+func TestNewApiKey(t *testing.T) {
+	// Load the test API key
+	apiKey, keyID, _ := loadTestApiKey(t)
+	if t.Skipped() {
+		return
+	}
+
 	// Verify the key ID was properly loaded
-	if apiKey.KeyID != testKeyID {
-		t.Errorf("Expected key ID to be %s, got %s", testKeyID, apiKey.KeyID)
+	if apiKey.KeyID != keyID {
+		t.Errorf("Expected key ID to be %s, got %s", keyID, apiKey.KeyID)
 	}
 
 	// Verify the secret was properly loaded
@@ -46,7 +60,7 @@ func TestNewApiKey(t *testing.T) {
 	}
 
 	// Test with an invalid base64 string - should return error
-	_, err = NewApiKey("test-key-id", "invalid-base64-!@#$")
+	_, err := NewApiKey("test-key-id", "invalid-base64-!@#$")
 	if err == nil {
 		t.Errorf("Expected error for invalid base64, got nil")
 	}
@@ -54,27 +68,10 @@ func TestNewApiKey(t *testing.T) {
 
 // TestApiKey verifies the context functionality of the API key implementation.
 func TestApiKey(t *testing.T) {
-	// Read the API key file to use a real key for testing
-	data, err := os.ReadFile("api.txt")
-	if err != nil {
-		t.Skipf("Skipping test, could not read API key file: %v", err)
+	// Load the test API key
+	apiKey, _, _ := loadTestApiKey(t)
+	if t.Skipped() {
 		return
-	}
-
-	// Parse the key and secret from the file
-	parts := strings.SplitN(strings.TrimSpace(string(data)), ":", 2)
-	if len(parts) != 2 {
-		t.Skipf("Skipping test, API key file has invalid format")
-		return
-	}
-
-	testKeyID := parts[0]
-	testSecret := parts[1]
-
-	// Load a test API key
-	apiKey, err := NewApiKey(testKeyID, testSecret)
-	if err != nil {
-		t.Fatalf("Failed to load API key: %v", err)
 	}
 
 	// Test context passing
@@ -96,28 +93,10 @@ func TestApiKey(t *testing.T) {
 // Note: For testing purposes only, we use a simple file format "key:secret" where secret is
 // already encoded in base64url format (using - and _ characters instead of + and /).
 func TestReadApiFromFile(t *testing.T) {
-	// Read the API key file
-	data, err := os.ReadFile("api.txt")
-	if err != nil {
-		t.Skipf("Skipping test, could not read API key file: %v", err)
+	// Load the test API key
+	apiKey, keyID, _ := loadTestApiKey(t)
+	if t.Skipped() {
 		return
-	}
-
-	// Parse the key and secret - for TESTING PURPOSES ONLY
-	// In real code, the key and secret would be provided by the API service
-	parts := strings.SplitN(strings.TrimSpace(string(data)), ":", 2)
-	if len(parts) != 2 {
-		t.Skipf("Skipping test, API key file has invalid format")
-		return
-	}
-
-	keyID := parts[0]
-	secret := parts[1] // Secret is already base64-encoded in the file
-
-	// Load the API key
-	apiKey, err := NewApiKey(keyID, secret)
-	if err != nil {
-		t.Fatalf("Failed to load API key: %v", err)
 	}
 
 	// Check the key ID
@@ -134,28 +113,10 @@ func TestReadApiFromFile(t *testing.T) {
 // TestUserGetWithApiKey tests a real API call using the API key.
 // This ensures the integration works as expected with actual requests.
 func TestUserGetWithApiKey(t *testing.T) {
-	// Read the API key file
-	data, err := os.ReadFile("api.txt")
-	if err != nil {
-		t.Skipf("Skipping test, could not read API key file: %v", err)
+	// Load the test API key
+	apiKey, _, _ := loadTestApiKey(t)
+	if t.Skipped() {
 		return
-	}
-
-	// Parse the key and secret - for TESTING PURPOSES ONLY
-	// In real code, the key and secret would be provided by the API service
-	parts := strings.SplitN(strings.TrimSpace(string(data)), ":", 2)
-	if len(parts) != 2 {
-		t.Skipf("Skipping test, API key file has invalid format")
-		return
-	}
-
-	keyID := parts[0]
-	secret := parts[1] // Secret is already base64-encoded in the file
-
-	// Load the API key
-	apiKey, err := NewApiKey(keyID, secret)
-	if err != nil {
-		t.Fatalf("Failed to load API key: %v", err)
 	}
 
 	// Create a context with the API key
@@ -171,7 +132,7 @@ func TestUserGetWithApiKey(t *testing.T) {
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	_, err = client.Get("https://" + Host)
+	_, err := client.Get("https://" + Host)
 	if err != nil {
 		t.Skipf("Skipping test, cannot reach server %s: %v", Host, err)
 		return
