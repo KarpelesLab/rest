@@ -28,23 +28,23 @@ func TestNewApiKey(t *testing.T) {
 
 	testKeyID := parts[0]
 	testSecret := parts[1]
-	
+
 	// Test with the real key
 	apiKey, err := NewApiKey(testKeyID, testSecret)
 	if err != nil {
 		t.Fatalf("Failed to load API key: %v", err)
 	}
-	
+
 	// Verify the key ID was properly loaded
 	if apiKey.KeyID != testKeyID {
 		t.Errorf("Expected key ID to be %s, got %s", testKeyID, apiKey.KeyID)
 	}
-	
+
 	// Verify the secret was properly loaded
 	if len(apiKey.SecretKey) != ed25519.PrivateKeySize {
 		t.Errorf("Expected secret key length to be %d, got %d", ed25519.PrivateKeySize, len(apiKey.SecretKey))
 	}
-	
+
 	// Test with an invalid base64 string - should return error
 	_, err = NewApiKey("test-key-id", "invalid-base64-!@#$")
 	if err == nil {
@@ -70,7 +70,7 @@ func TestApiKey(t *testing.T) {
 
 	testKeyID := parts[0]
 	testSecret := parts[1]
-	
+
 	// Load a test API key
 	apiKey, err := NewApiKey(testKeyID, testSecret)
 	if err != nil {
@@ -93,7 +93,7 @@ func TestApiKey(t *testing.T) {
 }
 
 // TestReadApiFromFile tests loading an API key from a file.
-// Note: For testing purposes only, we use a simple file format "key:secret" where secret is 
+// Note: For testing purposes only, we use a simple file format "key:secret" where secret is
 // already encoded in base64url format (using - and _ characters instead of + and /).
 func TestReadApiFromFile(t *testing.T) {
 	// Read the API key file
@@ -112,7 +112,7 @@ func TestReadApiFromFile(t *testing.T) {
 	}
 
 	keyID := parts[0]
-	secret := parts[1]  // Secret is already base64-encoded in the file
+	secret := parts[1] // Secret is already base64-encoded in the file
 
 	// Load the API key
 	apiKey, err := NewApiKey(keyID, secret)
@@ -128,24 +128,6 @@ func TestReadApiFromFile(t *testing.T) {
 	// Verify the secret was properly loaded
 	if len(apiKey.SecretKey) != ed25519.PrivateKeySize {
 		t.Errorf("Expected secret key length to be %d, got %d", ed25519.PrivateKeySize, len(apiKey.SecretKey))
-	}
-}
-
-// TestBodyHash verifies the body hashing mechanism.
-func TestBodyHash(t *testing.T) {
-	// Test empty body hash
-	emptyHash := BodyHash(nil)
-	expectedEmptyHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-	if emptyHash != expectedEmptyHash {
-		t.Errorf("Expected empty hash to be %s, got %s", expectedEmptyHash, emptyHash)
-	}
-
-	// Test with content
-	content := []byte("test content")
-	contentHash := BodyHash(content)
-	expectedContentHash := "6ae8a75555209fd6c44157c0aed8016e763ff435a19cf186f76863140143ff72"
-	if contentHash != expectedContentHash {
-		t.Errorf("Expected content hash to be %s, got %s", expectedContentHash, contentHash)
 	}
 }
 
@@ -168,7 +150,7 @@ func TestUserGetWithApiKey(t *testing.T) {
 	}
 
 	keyID := parts[0]
-	secret := parts[1]  // Secret is already base64-encoded in the file
+	secret := parts[1] // Secret is already base64-encoded in the file
 
 	// Load the API key
 	apiKey, err := NewApiKey(keyID, secret)
@@ -194,31 +176,31 @@ func TestUserGetWithApiKey(t *testing.T) {
 		t.Skipf("Skipping test, cannot reach server %s: %v", Host, err)
 		return
 	}
-	
+
 	// Print which server we're connecting to for debugging
 	t.Logf("Testing User:get API call with host: %s", Host)
 
 	var result UserInfo
 	err = Apply(ctx, "User:get", "GET", nil, &result)
-	
+
 	// This test should fail if the API key doesn't work
 	if err != nil {
 		t.Fatalf("User:get request returned error: %v", err)
 		return
 	}
-	
+
 	t.Logf("User:get request succeeded, got user ID: %s", result.UserID)
-	
+
 	// Verify that we got a valid user ID
 	if result.UserID == "" {
 		t.Errorf("User:get request succeeded but returned empty UserID")
 	}
-	
+
 	// Verify the UserID field is in the expected format (should start with usr-)
 	if len(result.UserID) < 5 || result.UserID[:4] != "usr-" {
 		t.Errorf("UserID has invalid format: %q", result.UserID)
 	}
-	
+
 	// Log the user ID for debugging
 	t.Logf("Got UserID: %s", result.UserID)
 }
@@ -228,15 +210,15 @@ func TestUserGetWithApiKey(t *testing.T) {
 func Example() {
 	// API key authentication is automatically handled by the library
 	// You obtain your API key (key ID and secret) from the service provider
-	// 
+	//
 	// 1. Load your API key into your application
 	// 2. Create a context with your API key
 	// ctx := context.Background()
 	// ctx = apiKey.Use(ctx)
-	// 
+	//
 	// 3. Use the context with any API call
 	// result, err := Do(ctx, "User:get", "GET", nil)
-	// 
+	//
 	// The library automatically:
 	// - Adds the key ID to the request parameters
 	// - Adds a timestamp and nonce for security

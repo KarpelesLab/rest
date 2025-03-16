@@ -6,7 +6,6 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -65,7 +64,7 @@ func NewApiKey(keyID, secret string) (*ApiKey, error) {
 			return nil, fmt.Errorf("invalid base64 secret: %w", err)
 		}
 	}
-	
+
 	// The API expects the secret key to be a full Ed25519 private key (64 bytes)
 	// We'll use the raw key as provided by the server
 	secretKey := decodedSecret
@@ -126,7 +125,7 @@ func (a *ApiKey) applyParams(ctx context.Context, method, path string, queryPara
 	if a == nil {
 		return fmt.Errorf("nil API key")
 	}
-	
+
 	// Add API key parameters
 	queryParams.Set("_key", a.KeyID)
 	queryParams.Set("_time", strconv.FormatInt(time.Now().Unix(), 10))
@@ -154,16 +153,6 @@ func (a *ApiKey) validateSignature(method, path string, queryParams url.Values, 
 	}
 
 	return expectedSignature == signature, nil
-}
-
-// BodyHash computes and returns the SHA256 hash of a byte array.
-// This is exposed for testing purposes.
-func BodyHash(body []byte) string {
-	h := sha256.New()
-	if body != nil {
-		h.Write(body)
-	}
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 // generateSignStringForTesting is a helper method to generate the sign string for testing and debugging.
