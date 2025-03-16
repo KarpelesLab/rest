@@ -38,7 +38,7 @@ var (
 // - param: Request parameters or body content
 // - target: Destination object for unmarshaled response data
 //
-// Returns an error if the request fails or response cannot be unmarshaled.
+// Returns: an error if the request fails or response cannot be unmarshaled.
 func Apply(ctx context.Context, path, method string, param any, target any) error {
 	res, err := Do(ctx, path, method, param)
 	if err != nil {
@@ -61,7 +61,7 @@ func Apply(ctx context.Context, path, method string, param any, target any) erro
 // - method: HTTP method (GET, POST, PUT, etc.)
 // - param: Request parameters or body content
 //
-// Returns the unmarshaled object of type T and any error encountered.
+// Returns: the unmarshaled object of type T and any error encountered.
 func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 	var target T
 	res, err := Do(ctx, path, method, param)
@@ -85,7 +85,7 @@ func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 // - method: HTTP method (GET, POST, PUT, etc.)
 // - param: Request parameters or body content
 //
-// Returns the raw Response object and any error encountered during the request.
+// Returns: the raw Response object and any error encountered during the request.
 func Do(ctx context.Context, path, method string, param any) (*Response, error) {
 	var backend *url.URL
 	if bk, ok := ctx.Value(BackendURL).(*url.URL); ok && bk != nil {

@@ -27,7 +27,7 @@ type SpotClient interface {
 // - param: Request parameters or body content
 // - target: Destination object for unmarshaled response data
 //
-// Returns an error if the request fails or response cannot be unmarshaled.
+// Returns: an error if the request fails or response cannot be unmarshaled.
 func SpotApply(ctx context.Context, client SpotClient, path, method string, param any, target any) error {
 	res, err := SpotDo(ctx, client, path, method, param)
 	if err != nil {
@@ -50,7 +50,7 @@ func SpotApply(ctx context.Context, client SpotClient, path, method string, para
 // - method: HTTP method (GET, POST, PUT, etc.)
 // - param: Request parameters or body content
 //
-// Returns the unmarshaled object of type T and any error encountered.
+// Returns: the unmarshaled object of type T and any error encountered.
 func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, param any) (T, error) {
 	var target T
 	res, err := SpotDo(ctx, client, path, method, param)
@@ -75,7 +75,7 @@ func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, 
 // - method: HTTP method (GET, POST, PUT, etc.)
 // - param: Request parameters or body content
 //
-// Returns the raw Response object and any error encountered during the request.
+// Returns: the raw Response object and any error encountered during the request.
 func SpotDo(ctx context.Context, client SpotClient, path, method string, param any) (*Response, error) {
 	req := map[string]any{
 		"path":   path,

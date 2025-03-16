@@ -69,7 +69,7 @@ type uploadAwsResp struct {
 // - f: Reader for the file content to upload
 // - mimeType: MIME type of the file content
 //
-// Returns the API response after upload completion or an error.
+// Returns: the API response after upload completion or an error.
 func SpotUpload(ctx context.Context, client SpotClient, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
@@ -114,7 +114,7 @@ func SpotUpload(ctx context.Context, client SpotClient, req, method string, para
 // - f: Reader for the file content to upload
 // - mimeType: MIME type of the file content
 //
-// Returns the API response after upload completion or an error.
+// Returns: the API response after upload completion or an error.
 func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
@@ -151,7 +151,7 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 //
 // - req: Map containing upload configuration from the server
 //
-// Returns an UploadInfo object or an error if preparation fails.
+// Returns: an UploadInfo object or an error if preparation fails.
 func PrepareUpload(req map[string]any) (*UploadInfo, error) {
 	// we have the following parameters:
 	// * PUT (url to put to)
@@ -247,7 +247,7 @@ func (u *UploadInfo) parse(req map[string]any) error {
 // - mimeType: MIME type of the file content
 // - ln: Length of the file in bytes, or -1 if unknown
 //
-// Returns the API response after upload completion or an error.
+// Returns: the API response after upload completion or an error.
 func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
 	u.ctx = ctx
 

@@ -125,34 +125,78 @@ func (r *Response) FullRaw() (map[string]any, error) {
 	return resp, nil
 }
 
+// Apply unmarshals the response data into the provided value.
+//
+// Parameters:
+//
+// - v: The target object to unmarshal into
+//
+// Returns: an error if unmarshaling fails
 func (r *Response) Apply(v any) error {
 	return pjson.Unmarshal(r.Data, v)
 }
 
+// ResponseAs is a generic helper that unmarshals a response into type T.
+//
+// Parameters:
+//
+// - r: The Response object containing data to unmarshal
+//
+// Returns: the unmarshaled object of type T and any error encountered
 func ResponseAs[T any](r *Response) (T, error) {
 	var target T
 	err := r.Apply(&target)
 	return target, err
 }
 
+// ApplyContext unmarshals the response data into the provided value using a context.
+//
+// Parameters:
+//
+// - ctx: Context for unmarshaling
+// - v: The target object to unmarshal into
+//
+// Returns: an error if unmarshaling fails
 func (r *Response) ApplyContext(ctx context.Context, v any) error {
 	return pjson.UnmarshalContext(ctx, r.Data, v)
 }
 
+// Value returns the parsed data from the response.
+// It lazily parses the JSON data on first access and caches the result.
+//
+// Returns: the parsed data and any error encountered during parsing
 func (r *Response) Value() (any, error) {
 	r.dataParse.Do(r.ParseData)
 	return r.dataParsed, r.dataError
 }
 
+// ValueContext returns the parsed data from the response, similar to Value().
+// It's provided for interface compatibility with methods requiring a context.
+//
+// Parameters:
+//
+// - ctx: Context (not used internally but provided for interface compatibility)
+//
+// Returns: the parsed data and any error encountered during parsing
 func (r *Response) ValueContext(ctx context.Context) (any, error) {
 	r.dataParse.Do(r.ParseData)
 	return r.dataParsed, r.dataError
 }
 
+// ParseData parses the JSON data in the response.
+// This is called automatically by Value() and ValueContext() methods.
 func (r *Response) ParseData() {
 	r.dataError = pjson.Unmarshal(r.Data, &r.dataParsed)
 }
 
+// Get retrieves a value from the response data by a slash-separated path.
+// For example, "user/name" would access the "name" field inside the "user" object.
+//
+// Parameters:
+//
+// - v: Slash-separated path to the requested value
+//
+// Returns: the value at the specified path and any error encountered
 func (r *Response) Get(v string) (any, error) {
 	va := strings.Split(v, "/")
 	cur, err := r.Value()
@@ -176,6 +220,14 @@ func (r *Response) Get(v string) (any, error) {
 	return cur, nil
 }
 
+// GetString retrieves a string value from the response data by a slash-separated path.
+// This is a convenience method that calls Get() and converts the result to a string.
+//
+// Parameters:
+//
+// - v: Slash-separated path to the requested string value
+//
+// Returns: the string value at the specified path and any error encountered
 func (r *Response) GetString(v string) (string, error) {
 	res, err := r.Get(v)
 	if err != nil {
