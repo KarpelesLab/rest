@@ -113,6 +113,22 @@ if err != nil {
 }
 ```
 
+## API Discovery
+
+To discover available endpoints and their parameters, you can use the `@karpeleslab/klbfw-describe` tool:
+
+```bash
+npx @karpeleslab/klbfw-describe SomeEndpoint/Path
+```
+
+This will display detailed information about the endpoint, including:
+- Available methods
+- Required and optional parameters
+- Return types
+- Access requirements
+
+This is especially useful when exploring new APIs or understanding existing endpoints.
+
 ## Testing
 
 The package includes a comprehensive test suite that can be run using:
