@@ -520,12 +520,17 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 	// maxLen in MB
 	maxLen := u.MaxPartSize
 
-	tmpf, err := ioutil.TempFile("", "upload*.bin")
+	tmpf, err := os.CreateTemp("", "upload*.bin")
 	if err != nil {
 		// failed to create temp file
 		readCh <- err
 		return
 	}
+	// attempt remove reference to the file in advance (O_TMPFILE allows achieving this too, but it's less easy to do)
+	// if the program exits while uploading, the file being already deleted means space is freed immediately
+	// we do not check for error as we've seen sometimes the file being re-created on write on some configs so we need
+	// to perform a os.Remove again at defer
+	os.Remove(tmpf.Name())
 	// cleanup
 	defer func() {
 		tmpf.Close()
