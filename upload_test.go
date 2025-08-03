@@ -24,11 +24,11 @@ func (*emptyReader) Read(b []byte) (int, error) {
 func generateTestInput(size int64) (io.Reader, hash.Hash) {
 	var input io.Reader
 	input = &io.LimitedReader{R: rand.Reader, N: size}
-	
+
 	// compute sha256 of bytes we send
 	hash := sha256.New()
 	input = io.TeeReader(input, hash)
-	
+
 	return input, hash
 }
 
@@ -49,7 +49,7 @@ func TestUpload(t *testing.T) {
 
 	log.Printf("Standard upload - expected hash = %s", hex.EncodeToString(hash.Sum(nil)))
 	log.Printf("Standard upload - response = %s", res.Data)
-	
+
 	// Verify we got a Blob__ field in the response
 	blobValue, err := res.GetString("Blob__")
 	if err != nil || blobValue == "" {
@@ -65,10 +65,10 @@ func TestUploadPutOnly(t *testing.T) {
 	if _, err := rand.Read(data); err != nil {
 		t.Fatalf("failed to generate random data: %s", err)
 	}
-	
+
 	// Create a seekable reader
 	input := bytes.NewReader(data)
-	
+
 	// Calculate expected hash
 	hash := sha256.Sum256(data)
 	expectedHash := hex.EncodeToString(hash[:])
@@ -85,13 +85,13 @@ func TestUploadPutOnly(t *testing.T) {
 
 	log.Printf("PUT-only upload - expected hash = %s", expectedHash)
 	log.Printf("PUT-only upload - response = %s", res.Data)
-	
+
 	// Verify we got a Blob__ field in the response
 	blobValue, err := res.GetString("Blob__")
 	if err != nil || blobValue == "" {
 		t.Errorf("Expected Blob__ field in response, got error: %v", err)
 	}
-	
+
 	// Verify SHA256 matches
 	shaValue, err := res.GetString("SHA256")
 	if err != nil || shaValue != expectedHash {
@@ -116,14 +116,14 @@ func TestUploadEmpty(t *testing.T) {
 	}
 
 	log.Printf("Empty standard upload - response = %s", res.Data)
-	
+
 	// Verify the SHA256 of an empty file
 	expectedEmptyHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-	
+
 	// Get the SHA256 from the response
 	shaValue, err := res.GetString("SHA256")
 	if err != nil || shaValue != expectedEmptyHash {
-		t.Errorf("Expected SHA256 of empty file to be %s, got %s (error: %v)", 
+		t.Errorf("Expected SHA256 of empty file to be %s, got %s (error: %v)",
 			expectedEmptyHash, shaValue, err)
 	}
 }
@@ -145,14 +145,14 @@ func TestUploadEmptyPutOnly(t *testing.T) {
 	}
 
 	log.Printf("Empty PUT-only upload - response = %s", res.Data)
-	
+
 	// Verify the SHA256 of an empty file
 	expectedEmptyHash := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-	
+
 	// Get the SHA256 from the response
 	shaValue, err := res.GetString("SHA256")
 	if err != nil || shaValue != expectedEmptyHash {
-		t.Errorf("Expected SHA256 of empty file to be %s, got %s (error: %v)", 
+		t.Errorf("Expected SHA256 of empty file to be %s, got %s (error: %v)",
 			expectedEmptyHash, shaValue, err)
 	}
 }

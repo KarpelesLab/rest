@@ -25,3 +25,10 @@ var RestHttpClient = &http.Client{
 	Transport: RestHttpTransport,
 	Timeout:   300 * time.Second,
 }
+
+// UploadHttpClient is the HTTP client used for upload requests, which might
+// need a longer timeout due to the actual upload.
+var UploadHttpClient = &http.Client{
+	Transport: RestHttpTransport,
+	Timeout:   time.Hour,
+}

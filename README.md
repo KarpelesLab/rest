@@ -9,7 +9,9 @@ A comprehensive Go client for interacting with RESTful API services. This packag
 
 - Simple API for RESTful requests with JSON encoding/decoding
 - Support for context-based configuration and cancellation
-- OAuth2 token management with automatic renewal
+- Multiple authentication methods:
+  - OAuth2 token management with automatic renewal
+  - API key authentication with secure request signing
 - Robust error handling with unwrapping to standard errors
 - Generic response parsing with type safety (Go 1.18+)
 - Large file uploads with multi-part and AWS S3 support
@@ -95,6 +97,106 @@ Installation:
 ```bash
 go install github.com/KarpelesLab/rest/cli/restupload@latest
 ```
+
+## Authentication
+
+### OAuth2 Token Authentication
+
+```go
+// Create a token
+token := &rest.Token{
+    AccessToken: "your-access-token",
+    RefreshToken: "your-refresh-token",
+    ClientID: "your-client-id",
+    Expires: 3600,
+}
+
+// Use the token in the context
+ctx := token.Use(context.Background())
+
+// Make authenticated requests
+result, err := rest.Do(ctx, "Protected/Resource", "GET", nil)
+```
+
+### API Key Authentication
+
+```go
+// Create an API key with the key ID and secret
+apiKey, err := rest.NewApiKey("key-12345", "your-secret")
+if err != nil {
+    log.Fatalf("Failed to create API key: %v", err)
+}
+
+// Use the API key in the context
+ctx := apiKey.Use(context.Background())
+
+// Make authenticated requests
+// The request will be automatically signed using the API key
+result, err := rest.Do(ctx, "Protected/Resource", "GET", nil)
+```
+
+```
+
+#### Complete API Key Authentication Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+    
+    "github.com/KarpelesLab/rest"
+)
+
+func main() {
+    // Read API key ID and secret from environment
+    keyID := os.Getenv("API_KEY_ID")
+    keySecret := os.Getenv("API_KEY_SECRET")
+    if keyID == "" || keySecret == "" {
+        log.Fatal("API_KEY_ID and API_KEY_SECRET environment variables are required")
+    }
+    
+    // Create an API key instance with the key ID and base64-encoded secret
+    apiKey, err := rest.NewApiKey(keyID, keySecret)
+    if err != nil {
+        log.Fatalf("Failed to create API key: %v", err)
+    }
+    
+    // Create a context with the API key
+    ctx := context.Background()
+    ctx = apiKey.Use(ctx)
+    
+    // Define the request parameters
+    params := map[string]interface{}{
+        "limit": 10,
+        "filter": "active",
+    }
+    
+    // Make the API call - the request will be automatically signed
+    var users []map[string]interface{}
+    err = rest.Apply(ctx, "User:list", "GET", params, &users)
+    if err != nil {
+        log.Fatalf("API request failed: %v", err)
+    }
+    
+    // Process the response
+    fmt.Printf("Found %d users\n", len(users))
+    for i, user := range users {
+        fmt.Printf("User %d: %s (%s)\n", i+1, user["name"], user["email"])
+    }
+}
+```
+
+The authentication process happens automatically:
+1. The library adds the API key ID as `_key` parameter
+2. It adds the current timestamp as `_time` parameter 
+3. It generates a unique nonce as `_nonce` parameter
+4. It builds a signature string from the method, path, query parameters, and request body
+5. It signs this string with the API key's secret using Ed25519
+6. It adds the signature as `_sign` parameter to complete the authentication
 
 ## Error Handling
 

@@ -277,7 +277,7 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	req.ContentLength = ln
 	req.Header.Set("Content-Type", mimeType)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := UploadHttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -407,7 +407,7 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 	req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", start, end))
 
 	// perform upload
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := UploadHttpClient.Do(req)
 	if err != nil {
 		select {
 		case errCh <- err:
@@ -727,7 +727,7 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 
 	req.ContentLength = ln
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := UploadHttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

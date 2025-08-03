@@ -20,11 +20,11 @@ import (
 
 var (
 	// Debug enables verbose logging of REST API requests and responses
-	Debug  = false
+	Debug = false
 	// Scheme defines the URL scheme for API requests (http or https)
 	Scheme = "https"
 	// Host defines the default hostname for API requests
-	Host   = "www.atonline.com"
+	Host = "www.atonline.com"
 )
 
 // Apply makes a REST API request and unmarshals the response data into the target object.
@@ -106,6 +106,13 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 
 	r.Header.Set("Sec-Rest-Http", "false")
 
+	// Extract the actual path name after _rest/ for API key signing
+	pathForSigning := path
+
+	// Prepare variables for request body and query parameters
+	var requestBody []byte
+	var queryParams url.Values = make(url.Values)
+
 	// add parameters (depending on method)
 	switch method {
 	case "GET", "HEAD", "OPTIONS":
@@ -114,12 +121,13 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 		if err != nil {
 			return nil, err
 		}
-		r.URL.RawQuery = "_=" + url.QueryEscape(string(data))
+		queryParams.Set("_", string(data))
 	case "PUT", "POST", "PATCH":
 		data, err := pjson.MarshalContext(ctx, param)
 		if err != nil {
 			return nil, err
 		}
+		requestBody = data
 		buf := bytes.NewReader(data)
 		r.Body = ioutil.NopCloser(buf)
 		r.ContentLength = int64(len(data))
@@ -134,15 +142,37 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 		return nil, fmt.Errorf("invalid request method %s", method)
 	}
 
+	// Check for API key authentication
+	var apiKey *ApiKey
+	if a, ok := ctx.Value(apiKeyValue(0)).(*ApiKey); a != nil && ok {
+		// Apply API key parameters and signature
+		apiKey = a
+		if err := apiKey.applyParams(ctx, method, pathForSigning, queryParams, requestBody); err != nil {
+			return nil, err
+		}
+		// Ensure _sign is the last parameter in the query string
+		// url.Values.Encode() sorts keys alphabetically, so we need to handle this manually
+		signValue := queryParams.Get("_sign")
+		queryParams.Del("_sign")
+		r.URL.RawQuery = queryParams.Encode() + "&_sign=" + url.QueryEscape(signValue)
+	} else {
+		// If no API key, use the standard query string for GET requests
+		if len(queryParams) > 0 {
+			r.URL.RawQuery = queryParams.Encode()
+		}
+	}
+
 	// final configuration
 	ctx.Value(r)
 
-	// check for rest token
+	// check for rest token (only if API key is not used)
 	var token *Token
-	if t, ok := ctx.Value(tokenValue(0)).(*Token); t != nil && ok {
-		// set token & authorization header
-		token = t
-		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+	if apiKey == nil {
+		if t, ok := ctx.Value(tokenValue(0)).(*Token); t != nil && ok {
+			// set token & authorization header
+			token = t
+			r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+		}
 	}
 
 	t := time.Now()

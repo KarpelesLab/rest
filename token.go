@@ -26,7 +26,7 @@ type withToken struct {
 
 var (
 	// ErrNoClientID is returned when token renewal is attempted without a client ID
-	ErrNoClientID     = errors.New("no client_id has been provided for token renewal")
+	ErrNoClientID = errors.New("no client_id has been provided for token renewal")
 	// ErrNoRefreshToken is returned when token renewal is attempted without a refresh token
 	ErrNoRefreshToken = errors.New("no refresh token is available and access token has expired")
 )

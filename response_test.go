@@ -34,22 +34,22 @@ func TestResponse(t *testing.T) {
 	if err != nil || errorVal != "" {
 		t.Errorf("OffsetGet(@error) = %v, %v, want \"\", nil", errorVal, err)
 	}
-	
+
 	codeVal, err := resp.OffsetGet(ctx, "@code")
 	if err != nil || codeVal != 0 {
 		t.Errorf("OffsetGet(@code) = %v, %v, want 0, nil", codeVal, err)
 	}
-	
+
 	extraVal, err := resp.OffsetGet(ctx, "@extra")
 	if err != nil || extraVal != "extra info" {
 		t.Errorf("OffsetGet(@extra) = %v, %v, want \"extra info\", nil", extraVal, err)
 	}
-	
+
 	tokenVal, err := resp.OffsetGet(ctx, "@token")
 	if err != nil || tokenVal != "test-token" {
 		t.Errorf("OffsetGet(@token) = %v, %v, want \"test-token\", nil", tokenVal, err)
 	}
-	
+
 	// Test data fields via OffsetGet
 	nameVal, err := resp.OffsetGet(ctx, "name")
 	if err != nil || nameVal != "test" {
@@ -170,10 +170,10 @@ func TestResponsePathAccess(t *testing.T) {
 	}{
 		{"level1/level2/level3/string", "nested value", false},
 		{"level1/sibling", "sibling value", false},
-		{"level1/level2/level3/number", "", true},  // Not a string
-		{"level1/level2/level3/bool", "", true},    // Not a string
-		{"nonexistent", "", true},                  // Path doesn't exist
-		{"empty", "", true},                        // Null value
+		{"level1/level2/level3/number", "", true}, // Not a string
+		{"level1/level2/level3/bool", "", true},   // Not a string
+		{"nonexistent", "", true},                 // Path doesn't exist
+		{"empty", "", true},                       // Null value
 	}
 
 	for _, tt := range stringTests {
