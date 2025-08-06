@@ -386,42 +386,62 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 		readCh <- nil
 	}
 
-	// rewind tmpf
-	tmpf.Seek(0, io.SeekStart)
+	tries := 0
 
-	// we can use simple PUT
-	req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, tmpf)
-	if err != nil {
-		select {
-		case errCh <- err:
-		default:
+	for {
+		// rewind tmpf
+		tmpf.Seek(0, io.SeekStart)
+
+		// we can use simple PUT
+		req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, tmpf)
+		if err != nil {
+			tries += 1
+			if tries < 5 {
+				continue
+			}
+
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
 		}
-		return
-	}
 
-	start := int64(partNo-1) * u.blocksize
-	end := start + n - 1 // inclusive
+		start := int64(partNo-1) * u.blocksize
+		end := start + n - 1 // inclusive
 
-	req.ContentLength = n // from io.CopyN
-	req.Header.Set("Content-Type", mimeType)
-	req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", start, end))
+		req.ContentLength = n // from io.CopyN
+		req.Header.Set("Content-Type", mimeType)
+		req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", start, end))
 
-	// perform upload
-	resp, err := UploadHttpClient.Do(req)
-	if err != nil {
-		select {
-		case errCh <- err:
-		default:
+		// perform upload
+		resp, err := UploadHttpClient.Do(req)
+		if err != nil {
+			tries += 1
+			if tries < 5 {
+				continue
+			}
+
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
 		}
-		return
-	}
-	defer resp.Body.Close() // avoid leaking stuff
-	// read full response, discard (ensures upload completed)
-	_, err = io.Copy(ioutil.Discard, resp.Body)
-	if err != nil {
-		select {
-		case errCh <- err:
-		default:
+		defer resp.Body.Close() // avoid leaking stuff
+		// read full response, discard (ensures upload completed)
+		_, err = io.Copy(ioutil.Discard, resp.Body)
+		if err != nil {
+			tries += 1
+			if tries < 5 {
+				continue
+			}
+
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
 		}
 		return
 	}
