@@ -21,32 +21,42 @@ import (
 
 // upload given file(s) to given API
 
-// cookieHandler is a context wrapper that intercepts *http.Request values to add cookies
-type cookieHandler struct {
+// requestHandler is a context wrapper that intercepts *http.Request values to modify them
+type requestHandler struct {
 	context.Context
-	cookies string
+	cookies   string
+	getParams string
 }
 
-// Value intercepts *http.Request values to add cookies
-func (ch *cookieHandler) Value(key any) any {
+// Value intercepts *http.Request values to add cookies and GET parameters
+func (rh *requestHandler) Value(key any) any {
 	if req, ok := key.(*http.Request); ok {
 		// Add cookies to the request
-		if ch.cookies != "" {
-			req.Header.Set("Cookie", ch.cookies)
+		if rh.cookies != "" {
+			req.Header.Set("Cookie", rh.cookies)
+		}
+		// Add GET parameters to the URL
+		if rh.getParams != "" {
+			if req.URL.RawQuery != "" {
+				req.URL.RawQuery += "&" + rh.getParams
+			} else {
+				req.URL.RawQuery = rh.getParams
+			}
 		}
 		return nil
 	}
 	// Pass through to parent context for other values
-	return ch.Context.Value(key)
+	return rh.Context.Value(key)
 }
 
 var (
-	api      = flag.String("api", "", "endpoint to direct upload to")
-	params   = flag.String("params", "", "params to pass to the API")
-	quiet    = flag.Bool("quiet", false, "suppress progress output")
-	hostname = flag.String("hostname", "", "override API hostname (e.g., api.example.com)")
-	method   = flag.String("method", "POST", "HTTP method for the initial API request")
-	cookies  = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
+	api       = flag.String("api", "", "endpoint to direct upload to")
+	params    = flag.String("params", "", "params to pass to the API")
+	getParams = flag.String("get", "", "GET query string parameters to append to the URL")
+	quiet     = flag.Bool("quiet", false, "suppress progress output")
+	hostname  = flag.String("hostname", "", "override API hostname (e.g., api.example.com)")
+	method    = flag.String("method", "POST", "HTTP method for the initial API request")
+	cookies   = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
 )
 
 func main() {
@@ -81,9 +91,13 @@ func main() {
 		ctx = context.WithValue(ctx, rest.BackendURL, backendURL)
 	}
 
-	// Wrap context with cookie handler if cookies are provided
-	if *cookies != "" {
-		ctx = &cookieHandler{Context: ctx, cookies: *cookies}
+	// Wrap context with request handler if cookies or GET params are provided
+	if *cookies != "" || *getParams != "" {
+		ctx = &requestHandler{
+			Context:   ctx,
+			cookies:   *cookies,
+			getParams: *getParams,
+		}
 	}
 
 	// Check if stderr is a terminal
