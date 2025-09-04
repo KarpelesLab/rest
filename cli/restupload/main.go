@@ -146,7 +146,7 @@ func (pr *progressReader) Read(p []byte) (n int, err error) {
 	// Display final progress on completion
 	if err == io.EOF {
 		pr.displayProgress()
-		fmt.Fprintf(os.Stderr, "\027[K\n")
+		fmt.Fprintf(os.Stderr, "\033[K\n")
 	}
 
 	return n, err
@@ -155,7 +155,7 @@ func (pr *progressReader) Read(p []byte) (n int, err error) {
 func (pr *progressReader) displayProgress() {
 	if pr.total <= 0 {
 		// Unknown total size, show bytes uploaded
-		fmt.Fprintf(os.Stderr, "\r%s: %s uploaded\027[K", pr.fileName, formatBytes(pr.current))
+		fmt.Fprintf(os.Stderr, "\r%s: %s uploaded\033[K", pr.fileName, formatBytes(pr.current))
 		return
 	}
 
@@ -179,7 +179,7 @@ func (pr *progressReader) displayProgress() {
 	}
 
 	// Display progress
-	fmt.Fprintf(os.Stderr, "\r%s: [%s] %.1f%% (%s/%s)\027[K",
+	fmt.Fprintf(os.Stderr, "\r%s: [%s] %.1f%% (%s/%s)\033[K",
 		pr.fileName,
 		string(bar),
 		percent,
@@ -239,7 +239,7 @@ func doUpload(ctx context.Context, fn string, p rest.Param, showProgress bool) e
 
 	if showProgress && err == nil {
 		// Ensure we end with a newline after progress display
-		fmt.Fprintf(os.Stderr, "\027[K\n")
+		fmt.Fprintf(os.Stderr, "\033[K\n")
 	}
 
 	return err
