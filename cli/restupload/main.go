@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"mime"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,10 +21,32 @@ import (
 
 // upload given file(s) to given API
 
+// cookieHandler is a context wrapper that intercepts *http.Request values to add cookies
+type cookieHandler struct {
+	context.Context
+	cookies string
+}
+
+// Value intercepts *http.Request values to add cookies
+func (ch *cookieHandler) Value(key any) any {
+	if req, ok := key.(*http.Request); ok {
+		// Add cookies to the request
+		if ch.cookies != "" {
+			req.Header.Set("Cookie", ch.cookies)
+		}
+		return nil
+	}
+	// Pass through to parent context for other values
+	return ch.Context.Value(key)
+}
+
 var (
-	api    = flag.String("api", "", "endpoint to direct upload to")
-	params = flag.String("params", "", "params to pass to the API")
-	quiet  = flag.Bool("quiet", false, "suppress progress output")
+	api      = flag.String("api", "", "endpoint to direct upload to")
+	params   = flag.String("params", "", "params to pass to the API")
+	quiet    = flag.Bool("quiet", false, "suppress progress output")
+	hostname = flag.String("hostname", "", "override API hostname (e.g., api.example.com)")
+	method   = flag.String("method", "POST", "HTTP method for the initial API request")
+	cookies  = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
 )
 
 func main() {
@@ -47,6 +71,21 @@ func main() {
 
 	args := flag.Args()
 
+	// Prepare context with hostname override if provided
+	ctx := context.Background()
+	if *hostname != "" {
+		backendURL := &url.URL{
+			Scheme: "https",
+			Host:   *hostname,
+		}
+		ctx = context.WithValue(ctx, rest.BackendURL, backendURL)
+	}
+
+	// Wrap context with cookie handler if cookies are provided
+	if *cookies != "" {
+		ctx = &cookieHandler{Context: ctx, cookies: *cookies}
+	}
+
 	// Check if stderr is a terminal
 	showProgress := !*quiet && term.IsTerminal(int(os.Stderr.Fd()))
 
@@ -54,7 +93,7 @@ func main() {
 		if !showProgress {
 			log.Printf("Uploading file %s", fn)
 		}
-		err := doUpload(fn, p, showProgress)
+		err := doUpload(ctx, fn, p, showProgress)
 		if err != nil {
 			log.Printf("failed to upload: %s", err)
 			os.Exit(1)
@@ -82,20 +121,20 @@ func newProgressReader(r io.Reader, total int64, fileName string) *progressReade
 func (pr *progressReader) Read(p []byte) (n int, err error) {
 	n, err = pr.reader.Read(p)
 	pr.current += int64(n)
-	
+
 	// Update progress display every 100ms
 	now := time.Now()
 	if now.Sub(pr.lastPrint) >= 100*time.Millisecond {
 		pr.displayProgress()
 		pr.lastPrint = now
 	}
-	
+
 	// Display final progress on completion
 	if err == io.EOF {
 		pr.displayProgress()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
-	
+
 	return n, err
 }
 
@@ -105,17 +144,17 @@ func (pr *progressReader) displayProgress() {
 		fmt.Fprintf(os.Stderr, "\r%s: %s uploaded", pr.fileName, formatBytes(pr.current))
 		return
 	}
-	
+
 	// Calculate percentage
 	percent := float64(pr.current) * 100.0 / float64(pr.total)
-	
+
 	// Create progress bar
 	barWidth := 30
 	filled := int(percent * float64(barWidth) / 100)
 	if filled > barWidth {
 		filled = barWidth
 	}
-	
+
 	bar := make([]rune, barWidth)
 	for i := 0; i < barWidth; i++ {
 		if i < filled {
@@ -124,7 +163,7 @@ func (pr *progressReader) displayProgress() {
 			bar[i] = '░'
 		}
 	}
-	
+
 	// Display progress
 	fmt.Fprintf(os.Stderr, "\r%s: [%s] %.1f%% (%s/%s)",
 		pr.fileName,
@@ -140,7 +179,7 @@ func formatBytes(bytes int64) string {
 		MB = KB * 1024
 		GB = MB * 1024
 	)
-	
+
 	switch {
 	case bytes >= GB:
 		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GB))
@@ -153,7 +192,7 @@ func formatBytes(bytes int64) string {
 	}
 }
 
-func doUpload(fn string, p rest.Param, showProgress bool) error {
+func doUpload(ctx context.Context, fn string, p rest.Param, showProgress bool) error {
 	f, err := os.Open(fn)
 	if err != nil {
 		return err
@@ -168,7 +207,7 @@ func doUpload(fn string, p rest.Param, showProgress bool) error {
 	}
 	pCopy["filename"] = filepath.Base(fn)
 	pCopy["type"] = mimeType
-	
+
 	var fileSize int64
 	if st, err := f.Stat(); err == nil {
 		fileSize = st.Size()
@@ -182,12 +221,12 @@ func doUpload(fn string, p rest.Param, showProgress bool) error {
 		reader = newProgressReader(f, fileSize, filepath.Base(fn))
 	}
 
-	_, err = rest.Upload(context.Background(), *api, "POST", pCopy, reader, mimeType)
-	
+	_, err = rest.Upload(ctx, *api, *method, pCopy, reader, mimeType)
+
 	if showProgress && err == nil {
 		// Ensure we end with a newline after progress display
 		fmt.Fprintf(os.Stderr, "\n")
 	}
-	
+
 	return err
 }
