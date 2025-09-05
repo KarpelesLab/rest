@@ -22,13 +22,13 @@ jobs:
         go-version: ${{ matrix.go-version }}
     
     - name: Get dependencies
-      run: make deps
+      run: go mod download
     
     - name: Build
-      run: make all
+      run: go build -v ./...
     
     - name: Test
-      run: make test
+      run: go test -v ./...
     
     - name: Test with coverage
       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
