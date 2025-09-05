@@ -391,17 +391,28 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 		readCh <- nil
 	}
 
-	tries := 0
+	maxRetries := 5
+	baseDelay := time.Second
 
-	for {
+	for attempt := 0; attempt < maxRetries; attempt++ {
 		// rewind tmpf
 		tmpf.Seek(0, io.SeekStart)
 
+		// Wrap tmpf with stall detection
+		var uploadBody io.Reader = tmpf
+		if n > 0 {
+			uploadBody = newStallDetectReader(u.ctx, tmpf)
+		}
+
 		// we can use simple PUT
-		req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, tmpf)
+		req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, uploadBody)
 		if err != nil {
-			tries += 1
-			if tries < 5 {
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
 				continue
 			}
 
@@ -422,8 +433,18 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 		// perform upload
 		resp, err := UploadHttpClient.Do(req)
 		if err != nil {
-			tries += 1
-			if tries < 5 {
+			// Check if it's a stall error
+			if errors.Is(err, ErrUploadStalled) && attempt < maxRetries-1 {
+				// For stalls, retry immediately
+				continue
+			}
+
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
 				continue
 			}
 
@@ -433,12 +454,18 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 			}
 			return
 		}
-		defer resp.Body.Close() // avoid leaking stuff
+
 		// read full response, discard (ensures upload completed)
 		_, err = io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close() // close immediately after reading
+
 		if err != nil {
-			tries += 1
-			if tries < 5 {
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
 				continue
 			}
 
@@ -448,11 +475,19 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 			}
 			return
 		}
-		// Report progress if callback is available
+
+		// Success! Report progress if callback is available
 		if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
 			progressFunc(n)
 		}
 		return
+	}
+
+	// All retry attempts failed
+	err = fmt.Errorf("upload failed after %d attempts", maxRetries)
+	select {
+	case errCh <- err:
+	default:
 	}
 }
 
@@ -586,31 +621,81 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 		readCh <- nil
 	}
 
-	// need to upload to aws
-	resp, err := u.awsReq("PUT", fmt.Sprintf("partNumber=%d&uploadId=%s", partNo, u.awsuploadid), tmpf, nil)
-	if err != nil {
-		select {
-		case errCh <- err:
-		default:
+	// Retry logic with exponential backoff
+	maxRetries := 5
+	baseDelay := time.Second
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Rewind tmpf for retry
+		tmpf.Seek(0, io.SeekStart)
+
+		// need to upload to aws
+		resp, err := u.awsReq("PUT", fmt.Sprintf("partNumber=%d&uploadId=%s", partNo, u.awsuploadid), tmpf, nil)
+		if err != nil {
+			// Check if it's a stall error or context cancellation
+			if errors.Is(err, ErrUploadStalled) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				// For stalls and context errors, retry immediately without backoff
+				if attempt < maxRetries-1 {
+					continue
+				}
+			}
+
+			// For other errors, use exponential backoff
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
+				continue
+			}
+
+			// Final attempt failed
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
 		}
-		return
-	}
-	defer resp.Body.Close()
-	_, err = io.Copy(ioutil.Discard, resp.Body)
-	if err != nil {
-		select {
-		case errCh <- err:
-		default:
+
+		// Try to read response
+		_, err = io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+
+		if err != nil {
+			// Retry on response read errors
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
+				continue
+			}
+
+			// Final attempt failed
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
+		}
+
+		// Success! Store etag value
+		u.setTag(partNo, resp.Header.Get("Etag"))
+
+		// Report progress if callback is available
+		if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+			progressFunc(n)
 		}
 		return
 	}
 
-	// store etag value
-	u.setTag(partNo, resp.Header.Get("Etag"))
-
-	// Report progress if callback is available
-	if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
-		progressFunc(n)
+	// All retry attempts failed
+	err = fmt.Errorf("AWS upload failed after %d attempts for part %d", maxRetries, partNo)
+	select {
+	case errCh <- err:
+	default:
 	}
 }
 
@@ -756,7 +841,14 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 	if query != "" {
 		target += "?" + query
 	}
-	req, err := http.NewRequestWithContext(u.ctx, method, target, body)
+
+	// Wrap body with stall detection for uploads
+	var uploadBody io.Reader = body
+	if body != nil && ln > 0 && method == "PUT" {
+		uploadBody = newStallDetectReader(u.ctx, body)
+	}
+
+	req, err := http.NewRequestWithContext(u.ctx, method, target, uploadBody)
 	if err != nil {
 		return nil, err
 	}
