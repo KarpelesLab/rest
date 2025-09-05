@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/KarpelesLab/rest"
@@ -115,52 +115,45 @@ func main() {
 	}
 }
 
-// progressReader wraps an io.Reader and tracks progress
-type progressReader struct {
-	reader    io.Reader
+// progressTracker tracks upload progress using a callback
+type progressTracker struct {
 	total     int64
 	current   int64
 	fileName  string
 	lastPrint time.Time
+	mu        sync.Mutex
 }
 
-func newProgressReader(r io.Reader, total int64, fileName string) *progressReader {
-	return &progressReader{
-		reader:   r,
+func newProgressTracker(total int64, fileName string) *progressTracker {
+	return &progressTracker{
 		total:    total,
 		fileName: fileName,
 	}
 }
 
-func (pr *progressReader) Read(p []byte) (n int, err error) {
-	n, err = pr.reader.Read(p)
-	pr.current += int64(n)
+func (pt *progressTracker) updateProgress(bytesUploaded int64) {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+
+	pt.current += bytesUploaded
 
 	// Update progress display every 100ms
 	now := time.Now()
-	if now.Sub(pr.lastPrint) >= 100*time.Millisecond {
-		pr.displayProgress()
-		pr.lastPrint = now
+	if now.Sub(pt.lastPrint) >= 100*time.Millisecond {
+		pt.displayProgress()
+		pt.lastPrint = now
 	}
-
-	// Display final progress on completion
-	if err == io.EOF {
-		pr.displayProgress()
-		fmt.Fprintf(os.Stderr, "\033[K\n")
-	}
-
-	return n, err
 }
 
-func (pr *progressReader) displayProgress() {
-	if pr.total <= 0 {
+func (pt *progressTracker) displayProgress() {
+	if pt.total <= 0 {
 		// Unknown total size, show bytes uploaded
-		fmt.Fprintf(os.Stderr, "\r%s: %s uploaded\033[K", pr.fileName, formatBytes(pr.current))
+		fmt.Fprintf(os.Stderr, "\r%s: %s uploaded\033[K", pt.fileName, formatBytes(pt.current))
 		return
 	}
 
 	// Calculate percentage
-	percent := float64(pr.current) * 100.0 / float64(pr.total)
+	percent := float64(pt.current) * 100.0 / float64(pt.total)
 
 	// Create progress bar
 	barWidth := 30
@@ -180,11 +173,19 @@ func (pr *progressReader) displayProgress() {
 
 	// Display progress
 	fmt.Fprintf(os.Stderr, "\r%s: [%s] %.1f%% (%s/%s)\033[K",
-		pr.fileName,
+		pt.fileName,
 		string(bar),
 		percent,
-		formatBytes(pr.current),
-		formatBytes(pr.total))
+		formatBytes(pt.current),
+		formatBytes(pt.total))
+}
+
+func (pt *progressTracker) finish() {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+
+	pt.displayProgress()
+	fmt.Fprintf(os.Stderr, "\033[K\n")
 }
 
 func formatBytes(bytes int64) string {
@@ -229,17 +230,18 @@ func doUpload(ctx context.Context, fn string, p rest.Param, showProgress bool) e
 		pCopy["lastModified"] = st.ModTime().Unix()
 	}
 
-	// Create reader with progress tracking if needed
-	var reader io.Reader = f
+	// Setup progress tracking if needed
+	var tracker *progressTracker
 	if showProgress {
-		reader = newProgressReader(f, fileSize, filepath.Base(fn))
+		tracker = newProgressTracker(fileSize, filepath.Base(fn))
+		// Add the progress callback to the context
+		ctx = context.WithValue(ctx, rest.UploadProgress, rest.UploadProgressFunc(tracker.updateProgress))
 	}
 
-	_, err = rest.Upload(ctx, *api, *method, pCopy, reader, mimeType)
+	_, err = rest.Upload(ctx, *api, *method, pCopy, f, mimeType)
 
-	if showProgress && err == nil {
-		// Ensure we end with a newline after progress display
-		fmt.Fprintf(os.Stderr, "\033[K\n")
+	if showProgress && tracker != nil {
+		tracker.finish()
 	}
 
 	return err

@@ -3,6 +3,7 @@ package rest
 type ContextRequest int
 
 const (
-	BackendURL   ContextRequest = 1
-	SkipDebugLog ContextRequest = 2
+	BackendURL     ContextRequest = 1
+	SkipDebugLog   ContextRequest = 2
+	UploadProgress ContextRequest = 3
 )

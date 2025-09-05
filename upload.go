@@ -285,6 +285,11 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	// read full response, discard (ensures upload completed)
 	io.Copy(ioutil.Discard, resp.Body)
 
+	// Report progress if callback is available (entire file uploaded)
+	if progressFunc, ok := ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+		progressFunc(ln)
+	}
+
 	return u.complete()
 }
 
@@ -443,6 +448,10 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 			}
 			return
 		}
+		// Report progress if callback is available
+		if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+			progressFunc(n)
+		}
 		return
 	}
 }
@@ -598,6 +607,11 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 
 	// store etag value
 	u.setTag(partNo, resp.Header.Get("Etag"))
+
+	// Report progress if callback is available
+	if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+		progressFunc(n)
+	}
 }
 
 func (u *UploadInfo) setTag(partNo int, tag string) {
