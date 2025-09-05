@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -129,11 +128,11 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 		}
 		requestBody = data
 		buf := bytes.NewReader(data)
-		r.Body = ioutil.NopCloser(buf)
+		r.Body = io.NopCloser(buf)
 		r.ContentLength = int64(len(data))
 		r.GetBody = func() (io.ReadCloser, error) {
 			reader := bytes.NewReader(data)
-			return ioutil.NopCloser(reader), nil
+			return io.NopCloser(reader), nil
 		}
 		r.Header.Set("Content-Type", "application/json")
 	case "DELETE":
@@ -183,7 +182,7 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +223,7 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 		}
 		defer resp.Body.Close()
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}

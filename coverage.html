@@ -1,0 +1,1808 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>rest: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/KarpelesLab/rest/error.go (44.4%)</option>
+				
+				<option value="file1">github.com/KarpelesLab/rest/nwg.go (100.0%)</option>
+				
+				<option value="file2">github.com/KarpelesLab/rest/proxy.go (0.0%)</option>
+				
+				<option value="file3">github.com/KarpelesLab/rest/response.go (31.0%)</option>
+				
+				<option value="file4">github.com/KarpelesLab/rest/rest.go (53.3%)</option>
+				
+				<option value="file5">github.com/KarpelesLab/rest/router.go (0.0%)</option>
+				
+				<option value="file6">github.com/KarpelesLab/rest/sender.go (0.0%)</option>
+				
+				<option value="file7">github.com/KarpelesLab/rest/spot.go (0.0%)</option>
+				
+				<option value="file8">github.com/KarpelesLab/rest/time.go (0.0%)</option>
+				
+				<option value="file9">github.com/KarpelesLab/rest/token.go (0.0%)</option>
+				
+				<option value="file10">github.com/KarpelesLab/rest/upload.go (56.5%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package rest provides a client for interacting with RESTful API services.
+package rest
+
+import (
+        "errors"
+        "fmt"
+        "io/fs"
+        "os"
+)
+
+// ErrLoginRequired is returned when an API endpoint requires authentication
+// but no valid token was provided.
+var ErrLoginRequired = errors.New("login required")
+
+// Error represents an error returned by a REST API endpoint.
+// It wraps the Response object and provides standard error interfaces.
+type Error struct {
+        Response *Response
+        parent   error
+}
+
+// Error returns a string representation of the REST API error.
+func (r *Error) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("[rest] error from server: %s", r.Response.Error)
+}</span>
+
+// Unwrap implements the errors.Unwrapper interface to allow error checking with errors.Is.
+// It maps REST API errors to standard Go errors where applicable (e.g., 403 to os.ErrPermission).
+func (r *Error) Unwrap() error <span class="cov8" title="1">{
+        if r.parent != nil </span><span class="cov0" title="0">{
+                return r.parent
+        }</span>
+        // check for various type of errors
+        <span class="cov8" title="1">switch r.Response.Code </span>{
+        case 403:<span class="cov8" title="1">
+                return os.ErrPermission</span>
+        case 404:<span class="cov8" title="1">
+                return fs.ErrNotExist</span>
+        default:<span class="cov0" title="0">
+                return nil</span>
+        }
+}
+
+// HttpError represents an HTTP transport error that occurred during a REST API request.
+// It captures HTTP status codes and response bodies for debugging.
+type HttpError struct {
+        Code int
+        Body []byte
+        e    error // unwrap error
+}
+
+// Error returns a string representation of the HTTP error.
+func (e *HttpError) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("HTTP Error %d: %s", e.Code, e.Body)
+}</span>
+
+// Unwrap implements the errors.Unwrapper interface to allow error checking with errors.Is.
+// It returns the underlying error, if any.
+func (e *HttpError) Unwrap() error <span class="cov0" title="0">{
+        return e.e
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package rest
+
+import "sync"
+
+type numeralWaitGroup struct {
+        cnt int
+        cd  *sync.Cond
+        lk  sync.RWMutex
+}
+
+func newNWG() *numeralWaitGroup <span class="cov8" title="1">{
+        res := &amp;numeralWaitGroup{}
+        res.cd = sync.NewCond(res.lk.RLocker())
+        return res
+}</span>
+
+func (n *numeralWaitGroup) Add(delta int) <span class="cov8" title="1">{
+        n.lk.Lock()
+        defer n.lk.Unlock()
+
+        n.cnt += delta
+
+        if delta &lt; 0 </span><span class="cov8" title="1">{
+                n.cd.Broadcast()
+        }</span>
+}
+
+func (n *numeralWaitGroup) Done() <span class="cov8" title="1">{
+        n.Add(-1)
+}</span>
+
+// Wait waits until there is less or equal than "min" tasks
+func (n *numeralWaitGroup) Wait(min int) <span class="cov8" title="1">{
+        n.lk.RLock()
+        defer n.lk.RUnlock()
+
+        for </span><span class="cov8" title="1">{
+                if n.cnt &lt;= min </span><span class="cov8" title="1">{
+                        return
+                }</span>
+                <span class="cov8" title="1">n.cd.Wait()</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">//go:build !wasm
+
+package rest
+
+import (
+        "net/http"
+        "net/http/httputil"
+        "net/url"
+)
+
+var (
+        SystemProxy = &amp;httputil.ReverseProxy{
+                Director:  systemProxyDirector,
+                Transport: RestHttpClient.Transport,
+        }
+)
+
+func systemProxyDirector(req *http.Request) <span class="cov0" title="0">{
+        if bk, ok := req.Context().Value(BackendURL).(*url.URL); ok &amp;&amp; bk != nil </span><span class="cov0" title="0">{
+                req.URL.Scheme = bk.Scheme
+                req.URL.Host = bk.Host
+        }</span> else<span class="cov0" title="0"> {
+                req.URL.Scheme = Scheme
+                req.URL.Host = Host
+        }</span>
+        //req.Host = Host
+        <span class="cov0" title="0">req.Header.Set("Host", req.URL.Host)
+        req.Header.Set("Sec-Rest-Http", "true")
+        req.Header.Del("Accept-Encoding")
+
+        if _, ok := req.Header["User-Agent"]; !ok </span><span class="cov0" title="0">{
+                // explicitly disable User-Agent so it's not set to default value
+                req.Header.Set("User-Agent", "")
+        }</span>
+        <span class="cov0" title="0">if _, ok := req.Header["Cookie"]; ok </span><span class="cov0" title="0">{
+                req.Header.Del("Cookie")
+        }</span>
+        // let context alter request as needed
+        <span class="cov0" title="0">req.Context().Value(req)</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package rest
+
+import (
+        "context"
+        "fmt"
+        "strings"
+        "sync"
+
+        "github.com/KarpelesLab/pjson"
+        "github.com/KarpelesLab/typutil"
+)
+
+// Param is a convenience type for parameters passed to REST API requests.
+type Param map[string]any
+
+// Response represents a REST API response with standard fields.
+// It handles different result types and provides methods to access response data.
+type Response struct {
+        Result string           `json:"result"` // "success" or "error" (or "redirect")
+        Data   pjson.RawMessage `json:"data,omitempty"`
+        Error  string           `json:"error,omitempty"`
+        Code   int              `json:"code,omitempty"` // for errors
+        Extra  string           `json:"extra,omitempty"`
+        Token  string           `json:"token,omitempty"`
+
+        Paging any `json:"paging,omitempty"`
+        Job    any `json:"job,omitempty"`
+        Time   any `json:"time,omitempty"`
+        Access any `json:"access,omitempty"`
+
+        Exception    string `json:"exception,omitempty"`
+        RedirectUrl  string `json:"redirect_url,omitempty"`
+        RedirectCode int    `json:"redirect_code,omitempty"`
+
+        dataParsed any
+        dataError  error
+        dataParse  sync.Once
+}
+
+// ReadValue returns the parsed data from the response.
+// It's an alias for Value() that satisfies interfaces requiring a context parameter.
+func (r *Response) ReadValue(ctx context.Context) (any, error) <span class="cov0" title="0">{
+        return r.Value()
+}</span>
+
+// OffsetGet implements the typutil.Getter interface for Response objects.
+// It allows accessing response fields by key, with special handling for metadata keys
+// prefixed with '@' (e.g., @error, @code).
+func (r *Response) OffsetGet(ctx context.Context, key string) (any, error) <span class="cov0" title="0">{
+        if strings.HasPrefix(key, "@") </span><span class="cov0" title="0">{
+                switch key[1:] </span>{
+                case "error":<span class="cov0" title="0">
+                        return r.Error, nil</span>
+                case "code":<span class="cov0" title="0">
+                        return r.Code, nil</span>
+                case "extra":<span class="cov0" title="0">
+                        return r.Extra, nil</span>
+                case "token":<span class="cov0" title="0">
+                        return r.Token, nil</span>
+                case "paging":<span class="cov0" title="0">
+                        return r.Paging, nil</span>
+                case "job":<span class="cov0" title="0">
+                        return r.Job, nil</span>
+                case "time":<span class="cov0" title="0">
+                        return r.Time, nil</span>
+                case "access":<span class="cov0" title="0">
+                        return r.Access, nil</span>
+                case "exception":<span class="cov0" title="0">
+                        return r.Exception, nil</span>
+                }
+        }
+
+        // return value
+        <span class="cov0" title="0">return r.Get(key)</span>
+}
+
+// Raw returns the parsed data from the response.
+// It's implemented as r.Value() for compatibility with older code.
+func (r *Response) Raw() (any, error) <span class="cov0" title="0">{
+        return r.Value()
+}</span>
+
+// FullRaw returns the complete response as a map, including both the data payload
+// and all metadata fields (result, error, code, etc.).
+func (r *Response) FullRaw() (map[string]any, error) <span class="cov0" title="0">{
+        data, err := r.Value()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">resp := map[string]any{"result": r.Result, "data": data}
+        if r.Error != "" </span><span class="cov0" title="0">{
+                resp["error"] = r.Error
+        }</span>
+        <span class="cov0" title="0">if r.Code != 0 </span><span class="cov0" title="0">{
+                resp["code"] = r.Code
+        }</span>
+        <span class="cov0" title="0">if r.Extra != "" </span><span class="cov0" title="0">{
+                resp["extra"] = r.Extra
+        }</span>
+        <span class="cov0" title="0">if r.Token != "" </span><span class="cov0" title="0">{
+                resp["token"] = r.Token
+        }</span>
+        <span class="cov0" title="0">if r.Paging != nil </span><span class="cov0" title="0">{
+                resp["paging"] = r.Paging
+        }</span>
+        <span class="cov0" title="0">if r.Job != nil </span><span class="cov0" title="0">{
+                resp["job"] = r.Job
+        }</span>
+        <span class="cov0" title="0">if r.Time != nil </span><span class="cov0" title="0">{
+                resp["time"] = r.Time
+        }</span>
+        <span class="cov0" title="0">if r.Access != nil </span><span class="cov0" title="0">{
+                resp["access"] = r.Access
+        }</span>
+        <span class="cov0" title="0">if r.Exception != "" </span><span class="cov0" title="0">{
+                resp["exception"] = r.Exception
+        }</span>
+        <span class="cov0" title="0">if r.RedirectUrl != "" </span><span class="cov0" title="0">{
+                resp["redirect_url"] = r.RedirectUrl
+        }</span>
+        <span class="cov0" title="0">if r.RedirectCode != 0 </span><span class="cov0" title="0">{
+                resp["redirect_code"] = r.RedirectCode
+        }</span>
+
+        <span class="cov0" title="0">return resp, nil</span>
+}
+
+// Apply unmarshals the response data into the provided value.
+//
+// Parameters:
+//
+// - v: The target object to unmarshal into
+//
+// Returns: an error if unmarshaling fails
+func (r *Response) Apply(v any) error <span class="cov8" title="1">{
+        return pjson.Unmarshal(r.Data, v)
+}</span>
+
+// ResponseAs is a generic helper that unmarshals a response into type T.
+//
+// Parameters:
+//
+// - r: The Response object containing data to unmarshal
+//
+// Returns: the unmarshaled object of type T and any error encountered
+func ResponseAs[T any](r *Response) (T, error) <span class="cov8" title="1">{
+        var target T
+        err := r.Apply(&amp;target)
+        return target, err
+}</span>
+
+// ApplyContext unmarshals the response data into the provided value using a context.
+//
+// Parameters:
+//
+// - ctx: Context for unmarshaling
+// - v: The target object to unmarshal into
+//
+// Returns: an error if unmarshaling fails
+func (r *Response) ApplyContext(ctx context.Context, v any) error <span class="cov0" title="0">{
+        return pjson.UnmarshalContext(ctx, r.Data, v)
+}</span>
+
+// Value returns the parsed data from the response.
+// It lazily parses the JSON data on first access and caches the result.
+//
+// Returns: the parsed data and any error encountered during parsing
+func (r *Response) Value() (any, error) <span class="cov8" title="1">{
+        r.dataParse.Do(r.ParseData)
+        return r.dataParsed, r.dataError
+}</span>
+
+// ValueContext returns the parsed data from the response, similar to Value().
+// It's provided for interface compatibility with methods requiring a context.
+//
+// Parameters:
+//
+// - ctx: Context (not used internally but provided for interface compatibility)
+//
+// Returns: the parsed data and any error encountered during parsing
+func (r *Response) ValueContext(ctx context.Context) (any, error) <span class="cov0" title="0">{
+        r.dataParse.Do(r.ParseData)
+        return r.dataParsed, r.dataError
+}</span>
+
+// ParseData parses the JSON data in the response.
+// This is called automatically by Value() and ValueContext() methods.
+func (r *Response) ParseData() <span class="cov8" title="1">{
+        r.dataError = pjson.Unmarshal(r.Data, &amp;r.dataParsed)
+}</span>
+
+// Get retrieves a value from the response data by a slash-separated path.
+// For example, "user/name" would access the "name" field inside the "user" object.
+//
+// Parameters:
+//
+// - v: Slash-separated path to the requested value
+//
+// Returns: the value at the specified path and any error encountered
+func (r *Response) Get(v string) (any, error) <span class="cov8" title="1">{
+        va := strings.Split(v, "/")
+        cur, err := r.Value()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">for _, sub := range va </span><span class="cov8" title="1">{
+                if sub == "" </span><span class="cov8" title="1">{
+                        continue</span>
+                }
+                // we assume each sub will be an index in cur as a map
+                <span class="cov8" title="1">cur, err = typutil.OffsetGet(context.Background(), cur, sub)
+                if err != nil </span><span class="cov0" title="0">{
+                        return cur, err
+                }</span>
+                <span class="cov8" title="1">if cur == nil </span><span class="cov0" title="0">{
+                        return nil, nil
+                }</span>
+        }
+        <span class="cov8" title="1">return cur, nil</span>
+}
+
+// GetString retrieves a string value from the response data by a slash-separated path.
+// This is a convenience method that calls Get() and converts the result to a string.
+//
+// Parameters:
+//
+// - v: Slash-separated path to the requested string value
+//
+// Returns: the string value at the specified path and any error encountered
+func (r *Response) GetString(v string) (string, error) <span class="cov8" title="1">{
+        res, err := r.Get(v)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+        <span class="cov8" title="1">str, ok := res.(string)
+        if !ok </span><span class="cov0" title="0">{
+                return fmt.Sprintf("%v", str), fmt.Errorf("unexpected type %T for string %s", res, v)
+        }</span>
+        <span class="cov8" title="1">return str, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">// Package rest provides a client for interacting with RESTful API services.
+// It simplifies making HTTP requests to REST endpoints, handling authentication,
+// token renewal, and response parsing.
+package rest
+
+import (
+        "bytes"
+        "context"
+        "fmt"
+        "io"
+        "io/ioutil"
+        "log/slog"
+        "net/http"
+        "net/url"
+        "time"
+
+        "github.com/KarpelesLab/pjson"
+        "github.com/KarpelesLab/webutil"
+)
+
+var (
+        // Debug enables verbose logging of REST API requests and responses
+        Debug  = false
+        // Scheme defines the URL scheme for API requests (http or https)
+        Scheme = "https"
+        // Host defines the default hostname for API requests
+        Host   = "www.atonline.com"
+)
+
+// Apply makes a REST API request and unmarshals the response data into the target object.
+// It handles authentication, error parsing, and JSON unmarshaling.
+//
+// Parameters:
+//
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+// - target: Destination object for unmarshaled response data
+//
+// Returns: an error if the request fails or response cannot be unmarshaled.
+func Apply(ctx context.Context, path, method string, param any, target any) error <span class="cov8" title="1">{
+        res, err := Do(ctx, path, method, param)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">err = pjson.UnmarshalContext(ctx, res.Data, target)
+        if Debug &amp;&amp; err != nil </span><span class="cov0" title="0">{
+                slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+        }</span>
+        <span class="cov8" title="1">return err</span>
+}
+
+// As makes a REST API request and returns the response data unmarshaled into the specified type T.
+// This is a generic version of Apply that returns the target object directly.
+//
+// Parameters:
+//
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns: the unmarshaled object of type T and any error encountered.
+func As[T any](ctx context.Context, path, method string, param any) (T, error) <span class="cov8" title="1">{
+        var target T
+        res, err := Do(ctx, path, method, param)
+        if err != nil </span><span class="cov0" title="0">{
+                return target, err
+        }</span>
+        <span class="cov8" title="1">err = pjson.UnmarshalContext(ctx, res.Data, &amp;target)
+        if Debug &amp;&amp; err != nil </span><span class="cov0" title="0">{
+                slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+        }</span>
+        <span class="cov8" title="1">return target, err</span>
+}
+
+// Do executes a REST API request and returns the raw Response object.
+// It handles token authentication, token renewal, parameter encoding, and error parsing.
+//
+// Parameters:
+//
+// - ctx: Context for the request, may contain authentication tokens
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns: the raw Response object and any error encountered during the request.
+func Do(ctx context.Context, path, method string, param any) (*Response, error) <span class="cov8" title="1">{
+        var backend *url.URL
+        if bk, ok := ctx.Value(BackendURL).(*url.URL); ok &amp;&amp; bk != nil </span><span class="cov0" title="0">{
+                backend = bk
+        }</span> else<span class="cov8" title="1"> {
+                backend = &amp;url.URL{Scheme: Scheme, Host: Host}
+        }</span>
+        // build http request
+        <span class="cov8" title="1">r := &amp;http.Request{
+                Method: method,
+                URL: &amp;url.URL{
+                        Scheme: backend.Scheme,
+                        Host:   backend.Host,
+                        Path:   "/_special/rest/" + path,
+                },
+                Header: make(http.Header),
+        }
+
+        r.Header.Set("Sec-Rest-Http", "false")
+
+        // add parameters (depending on method)
+        switch method </span>{
+        case "GET", "HEAD", "OPTIONS":<span class="cov8" title="1">
+                // need to pass parameters in GET
+                data, err := pjson.MarshalContext(ctx, param)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">r.URL.RawQuery = "_=" + url.QueryEscape(string(data))</span>
+        case "PUT", "POST", "PATCH":<span class="cov8" title="1">
+                data, err := pjson.MarshalContext(ctx, param)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">buf := bytes.NewReader(data)
+                r.Body = ioutil.NopCloser(buf)
+                r.ContentLength = int64(len(data))
+                r.GetBody = func() (io.ReadCloser, error) </span><span class="cov0" title="0">{
+                        reader := bytes.NewReader(data)
+                        return ioutil.NopCloser(reader), nil
+                }</span>
+                <span class="cov8" title="1">r.Header.Set("Content-Type", "application/json")</span>
+        case "DELETE":<span class="cov0" title="0"></span>
+                // nothing
+        default:<span class="cov0" title="0">
+                return nil, fmt.Errorf("invalid request method %s", method)</span>
+        }
+
+        // final configuration
+        <span class="cov8" title="1">ctx.Value(r)
+
+        // check for rest token
+        var token *Token
+        if t, ok := ctx.Value(tokenValue(0)).(*Token); t != nil &amp;&amp; ok </span><span class="cov0" title="0">{
+                // set token &amp; authorization header
+                token = t
+                r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+        }</span>
+
+        <span class="cov8" title="1">t := time.Now()
+
+        resp, err := RestHttpClient.Do(r)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to run rest query: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        body, err := ioutil.ReadAll(resp.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        //log.Printf(ctx, "[rest] Response to %s %s: %s", method, path, body)
+
+        <span class="cov8" title="1">result := &amp;Response{}
+        err = pjson.UnmarshalContext(ctx, body, result)
+        if err != nil </span><span class="cov0" title="0">{
+                if Debug </span><span class="cov0" title="0">{
+                        slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
+                }</span>
+                <span class="cov0" title="0">if resp.StatusCode &gt;= 400 </span><span class="cov0" title="0">{
+                        // this is an error response
+                        err = &amp;HttpError{Code: resp.StatusCode, Body: body, e: err}
+                }</span>
+                <span class="cov0" title="0">return nil, err</span>
+        }
+
+        <span class="cov8" title="1">if token != nil &amp;&amp; result.Token == "invalid_request_token" &amp;&amp; result.Extra == "token_expired" </span><span class="cov0" title="0">{
+                // token has expired, renew token &amp; re-run process
+                if Debug </span><span class="cov0" title="0">{
+                        slog.DebugContext(ctx, "Token has expired, requesting renew", "event", "rest:token_renew")
+                }</span>
+                <span class="cov0" title="0">if err := token.renew(ctx); err != nil </span><span class="cov0" title="0">{
+                        // error
+                        if Debug </span><span class="cov0" title="0">{
+                                slog.ErrorContext(ctx, fmt.Sprintf("failed to renew token: %s", err), "event", "rest:token_renew_fail")
+                        }</span>
+                        <span class="cov0" title="0">return nil, err</span>
+                }
+
+                // re-run query
+                <span class="cov0" title="0">r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+                resp, err := RestHttpClient.Do(r)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">defer resp.Body.Close()
+
+                body, err := ioutil.ReadAll(resp.Body)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+
+                <span class="cov0" title="0">err = pjson.UnmarshalContext(ctx, body, result)
+                if err != nil </span><span class="cov0" title="0">{
+                        if Debug </span><span class="cov0" title="0">{
+                                slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
+                        }</span>
+                        <span class="cov0" title="0">return nil, err</span>
+                }
+        }
+
+        <span class="cov8" title="1">if Debug </span><span class="cov0" title="0">{
+                if v, ok := ctx.Value(SkipDebugLog).(bool); !ok || !v </span><span class="cov0" title="0">{
+                        d := time.Since(t)
+                        slog.DebugContext(ctx, fmt.Sprintf("[rest] %s %s =&gt; %s", method, path, d), "event", "rest:debug_query", "rest:method", method, "rest:request", path, "rest:duration", d)
+                }</span>
+        }
+
+        <span class="cov8" title="1">if result.Result == "redirect" </span><span class="cov8" title="1">{
+                if result.Exception == "Exception\\Login" </span><span class="cov0" title="0">{
+                        return nil, ErrLoginRequired
+                }</span>
+                <span class="cov8" title="1">url, err := url.Parse(result.RedirectUrl)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">return nil, webutil.RedirectErrorCode(url, result.RedirectCode)</span>
+        }
+
+        <span class="cov8" title="1">if result.Result == "error" </span><span class="cov8" title="1">{
+                return nil, &amp;Error{Response: result}
+        }</span>
+
+        <span class="cov8" title="1">return result, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">//go:build !wasm
+
+package rest
+
+import "net/http"
+
+type RouterType struct {
+}
+
+var Router *RouterType = &amp;RouterType{}
+
+func (h *RouterType) ServeHTTP(w http.ResponseWriter, req *http.Request) <span class="cov0" title="0">{
+        // fallback to PHP, add prefix for rest
+        req.URL.Path = "/_special/rest" + req.URL.Path
+        SystemProxy.ServeHTTP(w, req)
+}</span>
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package rest
+
+import (
+        "context"
+        "io"
+)
+
+type SenderInterface interface {
+        Send(from string, to []string, msg io.WriterTo) error
+}
+
+type TokenSender struct {
+        Token string
+}
+
+type restSender struct{}
+
+var Sender SenderInterface = restSender{}
+
+func (s restSender) Send(from string, to []string, msg io.WriterTo) error <span class="cov0" title="0">{
+        reader, writer := io.Pipe()
+        defer reader.Close()
+        go func() </span><span class="cov0" title="0">{
+                defer writer.Close()
+                msg.WriteTo(writer)
+        }</span>()
+        <span class="cov0" title="0">_, err := Upload(context.Background(), "MTA:send", "POST", map[string]any{"from": from, "to": to}, reader, "message/rfc822")
+        return err</span>
+}
+
+func (s *TokenSender) Send(from string, to []string, msg io.WriterTo) error <span class="cov0" title="0">{
+        reader, writer := io.Pipe()
+        defer reader.Close()
+        go func() </span><span class="cov0" title="0">{
+                defer writer.Close()
+                msg.WriteTo(writer)
+        }</span>()
+        <span class="cov0" title="0">_, err := Upload(context.Background(), "MTA:send", "POST", map[string]any{"from": from, "to": to, "token": s.Token}, reader, "message/rfc822")
+        return err</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package rest
+
+import (
+        "context"
+        "fmt"
+        "log/slog"
+
+        "github.com/KarpelesLab/pjson"
+)
+
+// SpotClient is an interface fulfilled by spotlib.Client that provides
+// the necessary functionality for making API requests through a Spot connection.
+// Using this interface helps avoid dependency loops between packages.
+type SpotClient interface {
+        Query(ctx context.Context, target string, body []byte) ([]byte, error)
+}
+
+// SpotApply makes a REST API request through a SpotClient and unmarshals the response into target.
+// This is similar to Apply but uses a SpotClient for the request.
+//
+// Parameters:
+//
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+// - target: Destination object for unmarshaled response data
+//
+// Returns: an error if the request fails or response cannot be unmarshaled.
+func SpotApply(ctx context.Context, client SpotClient, path, method string, param any, target any) error <span class="cov0" title="0">{
+        res, err := SpotDo(ctx, client, path, method, param)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">err = pjson.UnmarshalContext(ctx, res.Data, target)
+        if Debug &amp;&amp; err != nil </span><span class="cov0" title="0">{
+                slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+        }</span>
+        <span class="cov0" title="0">return err</span>
+}
+
+// SpotAs makes a REST API request through a SpotClient and returns the response data unmarshaled into type T.
+// This is a generic version of SpotApply that returns the target object directly.
+//
+// Parameters:
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns: the unmarshaled object of type T and any error encountered.
+func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, param any) (T, error) <span class="cov0" title="0">{
+        var target T
+        res, err := SpotDo(ctx, client, path, method, param)
+        if err != nil </span><span class="cov0" title="0">{
+                return target, err
+        }</span>
+        <span class="cov0" title="0">err = pjson.UnmarshalContext(ctx, res.Data, &amp;target)
+        if Debug &amp;&amp; err != nil </span><span class="cov0" title="0">{
+                slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
+        }</span>
+        <span class="cov0" title="0">return target, err</span>
+}
+
+// SpotDo executes a REST API request through a SpotClient and returns the raw Response object.
+// This is the base function used by SpotApply and SpotAs.
+//
+// Parameters:
+//
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - path: API endpoint path
+// - method: HTTP method (GET, POST, PUT, etc.)
+// - param: Request parameters or body content
+//
+// Returns: the raw Response object and any error encountered during the request.
+func SpotDo(ctx context.Context, client SpotClient, path, method string, param any) (*Response, error) <span class="cov0" title="0">{
+        req := map[string]any{
+                "path":   path,
+                "verb":   method,
+                "params": param,
+        }
+        buf, err := pjson.Marshal(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">respbuf, err := client.Query(ctx, "@/p_api", buf)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">var resp *Response
+        err = pjson.Unmarshal(respbuf, &amp;resp)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return resp, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package rest
+
+import (
+        "context"
+        "time"
+
+        "github.com/KarpelesLab/pjson"
+)
+
+type Time struct {
+        time.Time
+}
+
+type timestampInternal struct {
+        Unix   int64  `json:"unix"`                    // 1597242491
+        Usec   int64  `json:"us"`                      // 747497
+        TZ     string `json:"tz,omitempty"`            // Asia/Tokyo
+        ISO    string `json:"iso,omitempty"`           // "2020-08-12 23:28:11.747497"
+        Full   int64  `json:"full,omitempty,string"`   // "1597242491747497"
+        UnixMS int64  `json:"unixms,omitempty,string"` // "1597242491747"
+}
+
+func (u *Time) UnmarshalJSON(data []byte) error <span class="cov0" title="0">{
+        // Ignore null, like in the main JSON package.
+        if string(data) == "null" </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">var sd timestampInternal
+        err := pjson.Unmarshal(data, &amp;sd)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">u.Time = time.Unix(sd.Unix, sd.Usec*1000) // *1000 means µs → ns
+        return nil</span>
+}
+
+func (u Time) MarshalJSON() ([]byte, error) <span class="cov0" title="0">{
+        var sd timestampInternal
+        sd.Unix = u.Unix()
+        sd.Usec = int64(u.Nanosecond() / 1000)
+        sd.TZ = u.Location().String()
+        sd.ISO = u.UTC().Format("2006-01-02 15:04:05")
+        sd.Full = u.UnixMicro()
+        sd.UnixMS = u.UnixMilli()
+
+        return pjson.Marshal(sd)
+}</span>
+
+func (u *Time) UnmarshalContextJSON(ctx context.Context, data []byte) error <span class="cov0" title="0">{
+        // Ignore null, like in the main JSON package.
+        if string(data) == "null" </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">var sd timestampInternal
+        err := pjson.UnmarshalContext(ctx, data, &amp;sd)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">u.Time = time.Unix(sd.Unix, sd.Usec*1000) // *1000 means µs → ns
+        return nil</span>
+}
+
+func (u Time) MarshalContextJSON(ctx context.Context) ([]byte, error) <span class="cov0" title="0">{
+        var sd timestampInternal
+        sd.Unix = u.Unix()
+        sd.Usec = int64(u.Nanosecond() / 1000)
+        sd.TZ = u.Location().String()
+        sd.ISO = u.UTC().Format("2006-01-02 15:04:05")
+        sd.Full = u.UnixMicro()
+        sd.UnixMS = u.UnixMilli()
+
+        return pjson.MarshalContext(ctx, sd)
+}</span>
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package rest
+
+import (
+        "context"
+        "errors"
+)
+
+// Token represents an OAuth2 token with refresh capabilities.
+// It contains both access and refresh tokens and methods to use them in requests.
+type Token struct {
+        AccessToken  string `json:"access_token"`
+        RefreshToken string `json:"refresh_token"`
+        Type         string `json:"token_type"`
+        ClientID     string
+        Expires      int `json:"expires_in"`
+}
+
+// tokenValue is a type used as a context key for token storage.
+type tokenValue int
+
+// withToken is a context wrapper that holds a token value.
+type withToken struct {
+        context.Context
+        token *Token
+}
+
+var (
+        // ErrNoClientID is returned when token renewal is attempted without a client ID
+        ErrNoClientID     = errors.New("no client_id has been provided for token renewal")
+        // ErrNoRefreshToken is returned when token renewal is attempted without a refresh token
+        ErrNoRefreshToken = errors.New("no refresh token is available and access token has expired")
+)
+
+// Value implements the context.Context Value method for withToken.
+// It returns the token for tokenValue keys and delegates to the parent context otherwise.
+func (w *withToken) Value(v any) any <span class="cov0" title="0">{
+        if _, ok := v.(tokenValue); ok </span><span class="cov0" title="0">{
+                return w.token
+        }</span>
+
+        <span class="cov0" title="0">return w.Context.Value(v)</span>
+}
+
+// Use returns a new context that includes this token for authentication.
+// The token will be used for all REST API calls that use this context.
+func (t *Token) Use(ctx context.Context) context.Context <span class="cov0" title="0">{
+        return &amp;withToken{ctx, t}
+}</span>
+
+// renew attempts to refresh an expired access token using the refresh token.
+// It makes a request to the OAuth2:token endpoint with the refresh token.
+func (t *Token) renew(ctx context.Context) error <span class="cov0" title="0">{
+        // perform renew of token via OAuth2:token endpoint
+        ctx = &amp;withToken{ctx, nil} // set token to nil
+
+        if t.ClientID == "" </span><span class="cov0" title="0">{
+                return ErrNoClientID
+        }</span>
+        <span class="cov0" title="0">if t.RefreshToken == "" </span><span class="cov0" title="0">{
+                return ErrNoRefreshToken
+        }</span>
+
+        <span class="cov0" title="0">req := map[string]any{
+                "grant_type":    "refresh_token",
+                "client_id":     t.ClientID,
+                "refresh_token": t.RefreshToken,
+                "noraw":         true,
+        }
+
+        err := Apply(ctx, "OAuth2:token", "POST", req, t)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // Apply will have updated AccessToken
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package rest
+
+import (
+        "bytes"
+        "context"
+        "crypto/sha256"
+        "encoding/hex"
+        "encoding/xml"
+        "errors"
+        "fmt"
+        "io"
+        "io/ioutil"
+        "net/http"
+        "os"
+        "sort"
+        "strings"
+        "sync"
+        "time"
+)
+
+// UploadInfo represents configuration and state for file uploads.
+// It supports different upload methods: direct PUT, multi-part uploads,
+// and AWS S3 uploads for large files.
+type UploadInfo struct {
+        // generic
+        put  string
+        cmpl string
+        ctx  context.Context
+        spot SpotClient
+
+        MaxPartSize     int64 // maximum size of a single part in MB, defaults to 1024 (1GB)
+        ParallelUploads int   // number of parallel uploads to perform (defaults to 3)
+
+        // put upload
+        blocksize int64
+
+        // aws upload
+        awsid     string
+        awskey    string
+        awsregion string
+        awsname   string
+        awshost   string
+
+        awsuploadid string // used during upload
+        awstags     []string
+        awstagsLk   sync.Mutex
+}
+
+type uploadAuth struct {
+        Authorization string `json:"authorization"`
+}
+
+type uploadAwsResp struct {
+        Bucket   string
+        Key      string
+        UploadId string
+}
+
+// SpotUpload uploads a file using a SpotClient.
+// This is similar to Upload but uses a specific SpotClient for the request.
+//
+// Parameters:
+//
+// - ctx: Context for the request
+// - client: SpotClient to use for the API request
+// - req: API endpoint path
+// - method: HTTP method for the initial API request
+// - param: Parameters for the initial API request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+//
+// Returns: the API response after upload completion or an error.
+func SpotUpload(ctx context.Context, client SpotClient, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) <span class="cov0" title="0">{
+        var upinfo map[string]any
+
+        err := SpotApply(ctx, client, req, method, param, &amp;upinfo)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("initial upload query failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">up, err := PrepareUpload(upinfo)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("upload prepare failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">up.spot = client
+
+        ln := int64(-1)
+
+        if fs, ok := f.(io.Seeker); ok </span><span class="cov0" title="0">{
+                ln, err = fs.Seek(0, io.SeekEnd)
+                if err != nil </span><span class="cov0" title="0">{
+                        // seek failed, let's continue in the unknown
+                        ln = -1
+                }</span> else<span class="cov0" title="0"> {
+                        // seek back to the start
+                        fs.Seek(0, io.SeekStart)
+                }</span>
+        }
+
+        <span class="cov0" title="0">return up.Do(ctx, f, mimeType, ln)</span>
+}
+
+// Upload uploads a file to a REST API endpoint.
+// It automatically selects the best upload method based on file size
+// and server capabilities (direct PUT, multi-part, or AWS S3).
+//
+// Parameters:
+//
+// - ctx: Context for the request
+// - req: API endpoint path
+// - method: HTTP method for the initial API request
+// - param: Parameters for the initial API request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+//
+// Returns: the API response after upload completion or an error.
+func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) <span class="cov8" title="1">{
+        var upinfo map[string]any
+
+        err := Apply(ctx, req, method, param, &amp;upinfo)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("initial upload query failed: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">up, err := PrepareUpload(upinfo)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("upload prepare failed: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">ln := int64(-1)
+
+        if fs, ok := f.(io.Seeker); ok </span><span class="cov8" title="1">{
+                ln, err = fs.Seek(0, io.SeekEnd)
+                if err != nil </span><span class="cov0" title="0">{
+                        // seek failed, let's continue in the unknown
+                        ln = -1
+                }</span> else<span class="cov8" title="1"> {
+                        // seek back to the start
+                        fs.Seek(0, io.SeekStart)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return up.Do(ctx, f, mimeType, ln)</span>
+}
+
+// PrepareUpload creates an UploadInfo from the server response to an upload request.
+// It parses server-provided upload parameters and prepares for the actual upload.
+//
+// Parameters:
+//
+// - req: Map containing upload configuration from the server
+//
+// Returns: an UploadInfo object or an error if preparation fails.
+func PrepareUpload(req map[string]any) (*UploadInfo, error) <span class="cov8" title="1">{
+        // we have the following parameters:
+        // * PUT (url to put to)
+        // * Complete (APÏ to call upon completion)
+        // we optionally support multipart upload for images over 5GB through extra parameters
+
+        up := &amp;UploadInfo{
+                MaxPartSize:     1024,
+                ParallelUploads: 3,
+        }
+        if err := up.parse(req); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">return up, nil</span>
+}
+
+// String returns the upload URL as a string representation of the UploadInfo.
+func (u *UploadInfo) String() string <span class="cov0" title="0">{
+        return u.put
+}</span>
+
+// parse extracts upload configuration from the server response.
+// It handles both standard PUT uploads and AWS S3 multipart uploads.
+func (u *UploadInfo) parse(req map[string]any) error <span class="cov8" title="1">{
+        var ok bool
+
+        //log.Printf("parsing upload response: %+v", req)
+
+        // strict minimum: PUT &amp; Complete
+        u.put, ok = req["PUT"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return errors.New("required parameter PUT not found")
+        }</span>
+        <span class="cov8" title="1">u.cmpl, ok = req["Complete"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return errors.New("required parameter Complete not found")
+        }</span>
+
+        // vars we care about:
+        // * Cloud_Aws_Bucket_Upload__
+        // * Key
+        // * Bucket_Endpoint.Region
+        // * Bucket_Endpoint.Name
+        // * Bucket_Endpoint.Host
+
+        // if we can't grab any of these, drop the whole thing and not set u.awsid so it won't be used
+
+        <span class="cov8" title="1">id, ok := req["Cloud_Aws_Bucket_Upload__"].(string)
+        if !ok </span><span class="cov8" title="1">{
+                // no id, but we don't care
+                if bs, ok := req["Blocksize"].(float64); ok </span><span class="cov0" title="0">{
+                        // we got a blocksize, this uses the new upload method
+                        u.blocksize = int64(bs)
+                        return nil
+                }</span>
+                <span class="cov8" title="1">return nil</span>
+        }
+        <span class="cov8" title="1">bucket, ok := req["Bucket_Endpoint"].(map[string]any)
+        if !ok </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">u.awskey, ok = req["Key"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">u.awsregion, ok = bucket["Region"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">u.awsname = bucket["Name"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov8" title="1">u.awshost = bucket["Host"].(string)
+        if !ok </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        // all ok, set awsid
+        <span class="cov8" title="1">u.awsid = id
+
+        return nil</span>
+}
+
+// Do performs the actual file upload using the appropriate method.
+// It automatically chooses between direct PUT, multi-part, or AWS S3 uploads
+// based on file size and server capabilities.
+//
+// Parameters:
+//
+// - ctx: Context for the upload request
+// - f: Reader for the file content to upload
+// - mimeType: MIME type of the file content
+// - ln: Length of the file in bytes, or -1 if unknown
+//
+// Returns: the API response after upload completion or an error.
+func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) <span class="cov8" title="1">{
+        u.ctx = ctx
+
+        if u.blocksize &gt; 0 </span><span class="cov0" title="0">{
+                return u.partUpload(f, mimeType)
+        }</span>
+        <span class="cov8" title="1">if u.awsid != "" </span><span class="cov8" title="1">{
+                if ln == -1 || ln &gt; 64*1024*1024 </span><span class="cov8" title="1">{
+                        return u.awsUpload(f, mimeType)
+                }</span>
+        }
+
+        <span class="cov8" title="1">if ln == -1 || ln &gt; 5*1024*1024*1024 </span><span class="cov0" title="0">{
+                return nil, errors.New("cannot upload using PUT method without a known length of less than 5GB")
+        }</span>
+        <span class="cov8" title="1">if ln == 0 </span><span class="cov8" title="1">{
+                // workaround bug with go http client when ContentLength it set to zero
+                f = bytes.NewReader([]byte{})
+        }</span>
+
+        // we can use simple PUT
+        <span class="cov8" title="1">req, err := http.NewRequestWithContext(ctx, http.MethodPut, u.put, f)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">req.ContentLength = ln
+        req.Header.Set("Content-Type", mimeType)
+
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close() // avoid leaking stuff
+        // read full response, discard (ensures upload completed)
+        io.Copy(ioutil.Discard, resp.Body)
+
+        return u.complete()</span>
+}
+
+func (u *UploadInfo) complete() (*Response, error) <span class="cov8" title="1">{
+        if u.spot != nil </span><span class="cov0" title="0">{
+                return SpotDo(u.ctx, u.spot, u.cmpl, "POST", map[string]any{})
+        }</span>
+        <span class="cov8" title="1">return Do(u.ctx, u.cmpl, "POST", map[string]any{})</span>
+}
+
+func (u *UploadInfo) partUpload(f io.Reader, mimeType string) (*Response, error) <span class="cov0" title="0">{
+        // partUpload works similar to awsUpload but when uploading to the new kind of PUT server
+
+        // let's upload
+        partNo := 0
+        errCh := make(chan error, 2) // enough just in case
+        nwg := newNWG()
+
+        eof := false
+        for !eof </span><span class="cov0" title="0">{
+                nwg.Wait(u.ParallelUploads - 1)
+                partNo += 1
+
+                readCh := make(chan error)
+
+                nwg.Add(1)
+                go u.partUploadPart(f, mimeType, partNo, readCh, errCh, nwg)
+
+                select </span>{
+                case err := &lt;-readCh:<span class="cov0" title="0">
+                        if err == io.EOF </span><span class="cov0" title="0">{
+                                eof = true
+                        }</span> else<span class="cov0" title="0"> if err != nil </span><span class="cov0" title="0">{
+                                // fatal error
+                                return nil, err
+                        }</span>
+                case err := &lt;-errCh:<span class="cov0" title="0">
+                        // fatal error
+                        return nil, err</span>
+                }
+        }
+
+        // wait for nwg completion
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                nwg.Wait(0)
+                // send "no error"
+                select </span>{
+                case errCh &lt;- nil:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                        // do not wait if send fails
+                }
+        }()
+
+        // read &amp; check error (cause waiting for completion)
+        <span class="cov0" title="0">err := &lt;-errCh
+        if err != nil </span><span class="cov0" title="0">{
+                // fatal error
+                return nil, err
+        }</span>
+
+        // finalize
+        <span class="cov0" title="0">return u.complete()</span>
+}
+
+func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, readCh, errCh chan&lt;- error, nwg *numeralWaitGroup) <span class="cov0" title="0">{
+        // prepare to upload a part
+        defer nwg.Done()
+
+        // we use temp files as to avoid using too much memory
+        tmpf, err := ioutil.TempFile("", "upload*.bin")
+        if err != nil </span><span class="cov0" title="0">{
+                // failed to create temp file
+                readCh &lt;- err
+                return
+        }</span>
+        // cleanup
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                tmpf.Close()
+                os.Remove(tmpf.Name())
+        }</span>()
+
+        <span class="cov0" title="0">n, err := io.CopyN(tmpf, f, u.blocksize)
+        if err != nil </span><span class="cov0" title="0">{
+                if err != io.EOF </span><span class="cov0" title="0">{
+                        // fatal error
+                        errCh &lt;- err
+                        return
+                }</span>
+                <span class="cov0" title="0">readCh &lt;- err
+                if n == 0 </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        } else<span class="cov0" title="0"> if n == 0 </span><span class="cov0" title="0">{
+                // no data to upload, just return EOF
+                readCh &lt;- io.EOF
+                return
+        }</span> else<span class="cov0" title="0"> {
+                // end of read
+                readCh &lt;- nil
+        }</span>
+
+        // rewind tmpf
+        <span class="cov0" title="0">tmpf.Seek(0, io.SeekStart)
+
+        // we can use simple PUT
+        req, err := http.NewRequestWithContext(u.ctx, http.MethodPut, u.put, tmpf)
+        if err != nil </span><span class="cov0" title="0">{
+                select </span>{
+                case errCh &lt;- err:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                }
+                <span class="cov0" title="0">return</span>
+        }
+
+        <span class="cov0" title="0">start := int64(partNo-1) * u.blocksize
+        end := start + n - 1 // inclusive
+
+        req.ContentLength = n // from io.CopyN
+        req.Header.Set("Content-Type", mimeType)
+        req.Header.Set("Content-Range", fmt.Sprintf("bytes %d-%d/*", start, end))
+
+        // perform upload
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                select </span>{
+                case errCh &lt;- err:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                }
+                <span class="cov0" title="0">return</span>
+        }
+        <span class="cov0" title="0">defer resp.Body.Close() // avoid leaking stuff
+        // read full response, discard (ensures upload completed)
+        _, err = io.Copy(ioutil.Discard, resp.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                select </span>{
+                case errCh &lt;- err:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                }
+                <span class="cov0" title="0">return</span>
+        }
+}
+
+func (u *UploadInfo) awsUpload(f io.Reader, mimeType string) (*Response, error) <span class="cov8" title="1">{
+        // awsUpload is a magic method that does not need to know upload length as it will split file into manageable sized pieces.
+        err := u.awsInit(mimeType)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // let's upload
+        <span class="cov8" title="1">partNo := 0
+        errCh := make(chan error, 2) // enough just in case
+        nwg := newNWG()
+
+        eof := false
+        for !eof </span><span class="cov8" title="1">{
+                nwg.Wait(u.ParallelUploads - 1)
+                partNo += 1
+
+                readCh := make(chan error)
+
+                nwg.Add(1)
+                go u.awsUploadPart(f, partNo, readCh, errCh, nwg)
+
+                select </span>{
+                case err := &lt;-readCh:<span class="cov8" title="1">
+                        if err == io.EOF </span><span class="cov8" title="1">{
+                                eof = true
+                        }</span> else<span class="cov0" title="0"> if err != nil </span><span class="cov0" title="0">{
+                                // fatal error, give up
+                                u.awsAbort()
+                                return nil, err
+                        }</span>
+                case err := &lt;-errCh:<span class="cov0" title="0">
+                        // fatal error, give up
+                        u.awsAbort()
+                        return nil, err</span>
+                }
+        }
+
+        // wait for nwg completion
+        <span class="cov8" title="1">go func() </span><span class="cov8" title="1">{
+                nwg.Wait(0)
+                // send "no error"
+                select </span>{
+                case errCh &lt;- nil:<span class="cov8" title="1"></span>
+                default:<span class="cov0" title="0"></span>
+                        // do not wait if send fails
+                }
+        }()
+
+        // read &amp; check error (cause waiting for completion)
+        <span class="cov8" title="1">err = &lt;-errCh
+        if err != nil </span><span class="cov0" title="0">{
+                // fatal error
+                u.awsAbort()
+                return nil, err
+        }</span>
+
+        // finalize
+        <span class="cov8" title="1">err = u.awsFinalize()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">return u.complete()</span>
+}
+
+func (u *UploadInfo) awsFinalize() error <span class="cov8" title="1">{
+        // see https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadComplete.html
+        buf := &amp;bytes.Buffer{}
+
+        fmt.Fprintf(buf, "&lt;CompleteMultipartUpload&gt;")
+        for n, tag := range u.awstags </span><span class="cov8" title="1">{
+                fmt.Fprintf(buf, "&lt;Part&gt;&lt;PartNumber&gt;%d&lt;/PartNumber&gt;&lt;ETag&gt;%s&lt;/ETag&gt;&lt;/Part&gt;", n+1, tag)
+        }</span>
+        <span class="cov8" title="1">fmt.Fprintf(buf, "&lt;/CompleteMultipartUpload&gt;")
+
+        resp, err := u.awsReq("POST", "uploadId="+u.awsuploadid, bytes.NewReader(buf.Bytes()), http.Header{"Content-Type": []string{"text/xml"}})
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+        _, err = io.Copy(ioutil.Discard, resp.Body)
+
+        return err</span>
+}
+
+func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan&lt;- error, nwg *numeralWaitGroup) <span class="cov8" title="1">{
+        // prepare to upload a part
+        defer nwg.Done()
+
+        // maxLen in MB
+        maxLen := u.MaxPartSize
+
+        tmpf, err := ioutil.TempFile("", "upload*.bin")
+        if err != nil </span><span class="cov0" title="0">{
+                // failed to create temp file
+                readCh &lt;- err
+                return
+        }</span>
+        // cleanup
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{
+                tmpf.Close()
+                os.Remove(tmpf.Name())
+        }</span>()
+
+        <span class="cov8" title="1">n, err := io.CopyN(tmpf, f, maxLen*1024*1024)
+        if err != nil </span><span class="cov8" title="1">{
+                if err != io.EOF </span><span class="cov0" title="0">{
+                        // fatal error
+                        errCh &lt;- err
+                        return
+                }</span>
+                <span class="cov8" title="1">readCh &lt;- err
+                if n == 0 &amp;&amp; partNo != 1 </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        } else<span class="cov0" title="0"> if n == 0 &amp;&amp; partNo != 1 </span><span class="cov0" title="0">{
+                // no data to upload, just return EOF unless we are part #1
+                readCh &lt;- io.EOF
+                return
+        }</span> else<span class="cov0" title="0"> {
+                // end of read
+                readCh &lt;- nil
+        }</span>
+
+        // need to upload to aws
+        <span class="cov8" title="1">resp, err := u.awsReq("PUT", fmt.Sprintf("partNumber=%d&amp;uploadId=%s", partNo, u.awsuploadid), tmpf, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                select </span>{
+                case errCh &lt;- err:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                }
+                <span class="cov0" title="0">return</span>
+        }
+        <span class="cov8" title="1">defer resp.Body.Close()
+        _, err = io.Copy(ioutil.Discard, resp.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                select </span>{
+                case errCh &lt;- err:<span class="cov0" title="0"></span>
+                default:<span class="cov0" title="0"></span>
+                }
+                <span class="cov0" title="0">return</span>
+        }
+
+        // store etag value
+        <span class="cov8" title="1">u.setTag(partNo, resp.Header.Get("Etag"))</span>
+}
+
+func (u *UploadInfo) setTag(partNo int, tag string) <span class="cov8" title="1">{
+        u.awstagsLk.Lock()
+        defer u.awstagsLk.Unlock()
+
+        pos := partNo - 1
+
+        if cap(u.awstags) &lt;= pos </span><span class="cov8" title="1">{
+                // need to increase cap
+                tmp := make([]string, len(u.awstags), cap(u.awstags)+64)
+                copy(tmp, u.awstags)
+                u.awstags = tmp
+        }</span>
+
+        <span class="cov8" title="1">if pos &gt;= len(u.awstags) </span><span class="cov8" title="1">{
+                u.awstags = u.awstags[:pos+1]
+        }</span>
+        <span class="cov8" title="1">u.awstags[pos] = tag</span>
+}
+
+func (u *UploadInfo) awsAbort() error <span class="cov0" title="0">{
+        resp, err := u.awsReq("DELETE", "uploadId="+u.awsuploadid, nil, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">defer resp.Body.Close()
+        _, err = io.Copy(ioutil.Discard, resp.Body)
+        return err</span>
+}
+
+func (u *UploadInfo) awsInit(mimeType string) error <span class="cov8" title="1">{
+        // see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html
+        resp, err := u.awsReq("POST", "uploads=", nil, http.Header{"Content-Type": []string{mimeType}, "X-Amz-Acl": []string{"private"}})
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        dec := xml.NewDecoder(resp.Body)
+
+        res := &amp;uploadAwsResp{}
+        err = dec.Decode(res)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">if res.UploadId == "" </span><span class="cov0" title="0">{
+                return errors.New("failed to read aws upload id")
+        }</span>
+
+        <span class="cov8" title="1">u.awsuploadid = res.UploadId
+        return nil</span>
+}
+
+func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers http.Header) (*http.Response, error) <span class="cov8" title="1">{
+        if headers == nil </span><span class="cov8" title="1">{
+                headers = http.Header{}
+        }</span>
+
+        // seek at end to know length
+        <span class="cov8" title="1">var ln int64
+        if body != nil </span><span class="cov8" title="1">{
+                var err error
+                ln, err = body.Seek(0, io.SeekEnd)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">body.Seek(0, io.SeekStart)
+
+                if ln == 0 </span><span class="cov8" title="1">{
+                        // this will allow stupid http.Request to generate the right headers
+                        body = bytes.NewReader([]byte{})
+                }</span>
+        }
+
+        // perform aws request using remote signature
+        <span class="cov8" title="1">var bodyHash string
+        if ln == 0 </span><span class="cov8" title="1">{
+                bodyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // sha256("")
+        }</span> else<span class="cov8" title="1"> {
+                h := sha256.New()
+                _, err := io.Copy(h, body)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">body.Seek(0, io.SeekStart) // reset to beginning
+
+                bodyHash = hex.EncodeToString(h.Sum(nil))</span>
+        }
+
+        <span class="cov8" title="1">ts := time.Now().UTC().Format("20060102T150405Z") // amz format
+        tsD := ts[:8]                                     // YYYYMMDD
+
+        headers.Set("X-Amz-Content-Sha256", bodyHash)
+        headers.Set("X-Amz-Date", ts)
+
+        awsAuthStr := []string{
+                "AWS4-HMAC-SHA256",
+                ts,
+                tsD + "/" + u.awsregion + "/s3/aws4_request",
+                method,
+                "/" + u.awsname + "/" + u.awskey,
+                query,
+                "host:" + u.awshost,
+        }
+
+        // list headers to sign (host and anything starting with x-)
+        signHead := []string{"host"}
+        for k, _ := range headers </span><span class="cov8" title="1">{
+                s := strings.ToLower(k)
+                if strings.HasPrefix(s, "x-") </span><span class="cov8" title="1">{
+                        signHead = append(signHead, s)
+                }</span>
+        }
+
+        // sort signHead
+        <span class="cov8" title="1">sort.Strings(signHead)
+
+        // add strings
+        for _, h := range signHead </span><span class="cov8" title="1">{
+                if h == "host" </span><span class="cov8" title="1">{
+                        // already added
+                        continue</span>
+                }
+                <span class="cov8" title="1">awsAuthStr = append(awsAuthStr, h+":"+headers.Get(h))</span>
+        }
+        <span class="cov8" title="1">awsAuthStr = append(awsAuthStr, "")
+        awsAuthStr = append(awsAuthStr, strings.Join(signHead, ";"))
+        awsAuthStr = append(awsAuthStr, bodyHash)
+
+        // generate signature
+        auth := &amp;uploadAuth{}
+        err := Apply(u.ctx, "Cloud/Aws/Bucket/Upload/"+u.awsid+":signV4", "POST", Param{"headers": strings.Join(awsAuthStr, "\n")}, auth)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">headers.Set("Authorization", auth.Authorization)
+
+        // perform the query
+        target := "https://" + u.awshost + "/" + u.awsname + "/" + u.awskey
+        if query != "" </span><span class="cov8" title="1">{
+                target += "?" + query
+        }</span>
+        <span class="cov8" title="1">req, err := http.NewRequestWithContext(u.ctx, method, target, body)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">for k, v := range headers </span><span class="cov8" title="1">{
+                req.Header[k] = v
+        }</span>
+
+        <span class="cov8" title="1">req.ContentLength = ln
+
+        resp, err := http.DefaultClient.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">if resp.StatusCode &gt;= 400 </span><span class="cov0" title="0">{
+                defer resp.Body.Close()
+                body, _ := ioutil.ReadAll(resp.Body)
+                return nil, fmt.Errorf("request failed: %s\ndetails: %s", resp.Status, body)
+        }</span>
+        <span class="cov8" title="1">return resp, err</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

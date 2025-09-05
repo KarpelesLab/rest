@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"sort"
@@ -283,7 +282,7 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	}
 	defer resp.Body.Close() // avoid leaking stuff
 	// read full response, discard (ensures upload completed)
-	io.Copy(ioutil.Discard, resp.Body)
+	io.Copy(io.Discard, resp.Body)
 
 	// Report progress if callback is available (entire file uploaded)
 	if progressFunc, ok := ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
@@ -359,7 +358,7 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 	defer nwg.Done()
 
 	// we use temp files as to avoid using too much memory
-	tmpf, err := ioutil.TempFile("", "upload*.bin")
+	tmpf, err := os.CreateTemp("", "upload*.bin")
 	if err != nil {
 		// failed to create temp file
 		readCh <- err
@@ -456,7 +455,7 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 		}
 
 		// read full response, discard (ensures upload completed)
-		_, err = io.Copy(ioutil.Discard, resp.Body)
+		_, err = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close() // close immediately after reading
 
 		if err != nil {
@@ -572,7 +571,7 @@ func (u *UploadInfo) awsFinalize() error {
 		return err
 	}
 	defer resp.Body.Close()
-	_, err = io.Copy(ioutil.Discard, resp.Body)
+	_, err = io.Copy(io.Discard, resp.Body)
 
 	return err
 }
@@ -659,7 +658,7 @@ func (u *UploadInfo) awsUploadPart(f io.Reader, partNo int, readCh, errCh chan<-
 		}
 
 		// Try to read response
-		_, err = io.Copy(ioutil.Discard, resp.Body)
+		_, err = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close()
 
 		if err != nil {
@@ -724,7 +723,7 @@ func (u *UploadInfo) awsAbort() error {
 		return err
 	}
 	defer resp.Body.Close()
-	_, err = io.Copy(ioutil.Discard, resp.Body)
+	_, err = io.Copy(io.Discard, resp.Body)
 	return err
 }
 
@@ -806,7 +805,7 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 
 	// list headers to sign (host and anything starting with x-)
 	signHead := []string{"host"}
-	for k, _ := range headers {
+	for k := range headers {
 		s := strings.ToLower(k)
 		if strings.HasPrefix(s, "x-") {
 			signHead = append(signHead, s)
@@ -864,7 +863,7 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 	}
 	if resp.StatusCode >= 400 {
 		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("request failed: %s\ndetails: %s", resp.Status, body)
 	}
 	return resp, err
