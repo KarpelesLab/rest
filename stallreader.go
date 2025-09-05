@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,8 @@ type stallDetectReader struct {
 	stallThreshold int64
 	lastProgress   time.Time
 	bytesInPeriod  int64
+	closed         chan struct{}
+	closeOnce      sync.Once
 }
 
 // newStallDetectReader creates a new reader that detects stalls.
@@ -29,16 +32,11 @@ func newStallDetectReader(ctx context.Context, r io.Reader) *stallDetectReader {
 		stallTimeout:   30 * time.Second,
 		stallThreshold: 150 * 1024, // 150KB
 		lastProgress:   time.Now(),
+		closed:         make(chan struct{}),
 	}
 }
 
 func (sr *stallDetectReader) Read(p []byte) (n int, err error) {
-	// Check if context is cancelled
-	select {
-	case <-sr.ctx.Done():
-		return 0, sr.ctx.Err()
-	default:
-	}
 
 	// Set up a timer for read timeout
 	timer := time.NewTimer(sr.stallTimeout)
@@ -58,6 +56,8 @@ func (sr *stallDetectReader) Read(p []byte) (n int, err error) {
 	}()
 
 	select {
+	case <-sr.closed:
+		return 0, io.ErrClosedPipe
 	case <-sr.ctx.Done():
 		return 0, sr.ctx.Err()
 	case <-timer.C:
@@ -87,4 +87,17 @@ func (sr *stallDetectReader) Read(p []byte) (n int, err error) {
 
 		return res.n, res.err
 	}
+}
+
+// Close implements io.Closer to allow clean shutdown
+func (sr *stallDetectReader) Close() error {
+	sr.closeOnce.Do(func() {
+		close(sr.closed)
+	})
+
+	// If the underlying reader implements io.Closer, close it too
+	if closer, ok := sr.reader.(io.Closer); ok {
+		return closer.Close()
+	}
+	return nil
 }
