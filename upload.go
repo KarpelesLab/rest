@@ -45,6 +45,17 @@ type UploadInfo struct {
 	awstagsLk   sync.Mutex
 }
 
+type UploadWriteHandler struct {
+	info *UploadInfo
+	rd   *io.PipeReader
+	wr   *io.PipeWriter
+	mu   sync.Mutex // resp/err mutex (locked once request ends)
+	resp *Response
+	err  error
+}
+
+var _ io.WriteCloser = &UploadWriteHandler{}
+
 type uploadAuth struct {
 	Authorization string `json:"authorization"`
 }
@@ -100,6 +111,34 @@ func SpotUpload(ctx context.Context, client SpotClient, req, method string, para
 	return up.Do(ctx, f, mimeType, ln)
 }
 
+func SpotUploadWriter(ctx context.Context, client SpotClient, req, method string, param Param, mimeType string) (*UploadWriteHandler, error) {
+	var upinfo map[string]any
+
+	err := SpotApply(ctx, client, req, method, param, &upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("initial upload query failed: %w", err)
+	}
+
+	up, err := PrepareUpload(upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("upload prepare failed: %w", err)
+	}
+
+	up.spot = client
+
+	rdpipe, wrpipe := io.Pipe()
+
+	wr := &UploadWriteHandler{
+		info: up,
+		rd:   rdpipe,
+		wr:   wrpipe,
+	}
+	wr.mu.Lock()
+	go wr.do(ctx, mimeType, -1)
+
+	return wr, nil
+}
+
 // Upload uploads a file to a REST API endpoint.
 // It automatically selects the best upload method based on file size
 // and server capabilities (direct PUT, multi-part, or AWS S3).
@@ -141,6 +180,73 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 	}
 
 	return up.Do(ctx, f, mimeType, ln)
+}
+
+func UploadWriter(ctx context.Context, req, method string, param Param, mimeType string) (*UploadWriteHandler, error) {
+	var upinfo map[string]any
+
+	err := Apply(ctx, req, method, param, &upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("initial upload query failed: %w", err)
+	}
+
+	up, err := PrepareUpload(upinfo)
+	if err != nil {
+		return nil, fmt.Errorf("upload prepare failed: %w", err)
+	}
+
+	rdpipe, wrpipe := io.Pipe()
+
+	wr := &UploadWriteHandler{
+		info: up,
+		rd:   rdpipe,
+		wr:   wrpipe,
+	}
+	wr.mu.Lock()
+
+	go wr.do(ctx, mimeType, -1)
+
+	return wr, nil
+}
+
+func (up *UploadWriteHandler) do(ctx context.Context, mimeType string, ln int64) {
+	defer up.mu.Unlock()
+
+	stop := context.AfterFunc(ctx, func() {
+		// context has been cancelled while the request is still ongoing
+		up.wr.CloseWithError(ctx.Err())
+	})
+	defer stop()
+
+	up.resp, up.err = up.info.Do(ctx, up.rd, mimeType, ln)
+}
+
+func (up *UploadWriteHandler) Write(b []byte) (n int, err error) {
+	return up.wr.Write(b)
+}
+
+func (up *UploadWriteHandler) Close() error {
+	// close the writing side of the pipe
+	up.wr.Close()
+
+	// the read side should end with io.EOF
+	// by acquiring the lock here we wait for the read to end & api to complete
+	up.mu.Lock()
+	defer up.mu.Unlock()
+
+	return up.err
+}
+
+func (up *UploadWriteHandler) CloseWithResponse() (*Response, error) {
+	// close the writing side of the pipe
+	up.wr.Close()
+
+	// the read side should end with io.EOF
+	// by acquiring the lock here we wait for the read to end & api to complete
+	up.mu.Lock()
+	defer up.mu.Unlock()
+
+	return up.resp, up.err
 }
 
 // PrepareUpload creates an UploadInfo from the server response to an upload request.
