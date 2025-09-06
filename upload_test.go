@@ -186,7 +186,7 @@ func TestUploadWriter(t *testing.T) {
 		if end > len(data) {
 			end = len(data)
 		}
-		
+
 		n, err := writer.Write(data[i:end])
 		if err != nil {
 			t.Fatalf("failed to write chunk at offset %d: %s", i, err)
@@ -218,4 +218,3 @@ func TestUploadWriter(t *testing.T) {
 			expectedHash, shaValue, err)
 	}
 }
-
