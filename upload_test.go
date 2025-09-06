@@ -156,3 +156,66 @@ func TestUploadEmptyPutOnly(t *testing.T) {
 			expectedEmptyHash, shaValue, err)
 	}
 }
+
+// TestUploadWriter tests the new writer-based upload interface
+func TestUploadWriter(t *testing.T) {
+	// Generate 2MB of random data
+	data := make([]byte, 2*1024*1024)
+	if _, err := rand.Read(data); err != nil {
+		t.Fatalf("failed to generate random data: %s", err)
+	}
+
+	// Calculate expected hash
+	hash := sha256.Sum256(data)
+	expectedHash := hex.EncodeToString(hash[:])
+
+	ctx := context.Background()
+	writer, err := UploadWriter(ctx, "Misc/Debug:testUpload", "POST", Param{
+		"filename": "test_writer.bin",
+		"put_only": false,
+	}, "application/octet-stream")
+
+	if err != nil {
+		t.Fatalf("failed to create upload writer: %s", err)
+	}
+
+	// Write data in chunks to test streaming
+	chunkSize := 256 * 1024 // 256KB chunks
+	for i := 0; i < len(data); i += chunkSize {
+		end := i + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		
+		n, err := writer.Write(data[i:end])
+		if err != nil {
+			t.Fatalf("failed to write chunk at offset %d: %s", i, err)
+		}
+		if n != end-i {
+			t.Errorf("expected to write %d bytes, wrote %d", end-i, n)
+		}
+	}
+
+	// Close and get response
+	res, err := writer.CloseWithResponse()
+	if err != nil {
+		t.Fatalf("failed to close upload writer: %s", err)
+	}
+
+	log.Printf("Writer upload - expected hash = %s", expectedHash)
+	log.Printf("Writer upload - response = %s", res.Data)
+
+	// Verify we got a Blob__ field in the response
+	blobValue, err := res.GetString("Blob__")
+	if err != nil || blobValue == "" {
+		t.Errorf("Expected Blob__ field in response, got error: %v", err)
+	}
+
+	// Verify SHA256 matches
+	shaValue, err := res.GetString("SHA256")
+	if err != nil || shaValue != expectedHash {
+		t.Errorf("Expected SHA256 %s, got %s (error: %v)",
+			expectedHash, shaValue, err)
+	}
+}
+
