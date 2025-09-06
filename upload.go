@@ -503,10 +503,11 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 		// rewind tmpf
 		tmpf.Seek(0, io.SeekStart)
 
-		// Wrap tmpf with stall detection
-		var uploadBody io.Reader = tmpf
+		// Wrap tmpf with NopCloser to prevent HTTP from closing our file
+		// and optionally add stall detection
+		var uploadBody io.Reader = io.NopCloser(tmpf)
 		if n > 0 {
-			uploadBody = newStallDetectReader(u.ctx, tmpf)
+			uploadBody = newStallDetectReader(u.ctx, uploadBody)
 		}
 
 		// we can use simple PUT
@@ -947,10 +948,12 @@ func (u *UploadInfo) awsReq(method, query string, body io.ReadSeeker, headers ht
 		target += "?" + query
 	}
 
-	// Wrap body with stall detection for uploads
+	// Wrap body with stall detection for uploads and NopCloser to prevent HTTP from closing
 	var uploadBody io.Reader = body
 	if body != nil && ln > 0 && method == "PUT" {
-		uploadBody = newStallDetectReader(u.ctx, body)
+		uploadBody = newStallDetectReader(u.ctx, io.NopCloser(body))
+	} else if body != nil {
+		uploadBody = io.NopCloser(body)
 	}
 
 	req, err := http.NewRequestWithContext(u.ctx, method, target, uploadBody)
