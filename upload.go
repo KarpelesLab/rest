@@ -356,12 +356,17 @@ func (u *UploadInfo) parse(req map[string]any) error {
 func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln int64) (*Response, error) {
 	u.ctx = ctx
 
+	// Report progress callback with 0 to signal upload is starting
+	if progressFunc, ok := ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+		progressFunc(0)
+	}
+
 	if u.blocksize > 0 {
 		return u.partUpload(f, mimeType)
 	}
 	if u.awsid != "" {
 		if ln == -1 || ln > 64*1024*1024 {
-			return u.awsUpload(f, mimeType)
+			return u.awsUpload(f, mimeType, ln)
 		}
 	}
 
@@ -597,11 +602,33 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 	}
 }
 
-func (u *UploadInfo) awsUpload(f io.Reader, mimeType string) (*Response, error) {
+func (u *UploadInfo) awsUpload(f io.Reader, mimeType string, fileSize int64) (*Response, error) {
 	// awsUpload is a magic method that does not need to know upload length as it will split file into manageable sized pieces.
+
+	// Calculate optimal part size if we know the file size
+	if fileSize > 0 {
+		// AWS S3 has a max of 5TB per file
+		if fileSize > 5*1024*1024*1024*1024 {
+			return nil, fmt.Errorf("file size %d exceeds AWS S3 maximum of 5TB", fileSize)
+		}
+
+		// Calculate part size to stay under 10,000 parts limit
+		// Part size in MB = fileSize / (10000 * 1024 * 1024)
+		partSize := fileSize / (10000 * 1024 * 1024)
+		if partSize < 5 {
+			partSize = 5 // Minimum 5MB per part (except last)
+		}
+		u.MaxPartSize = partSize
+	}
+
 	err := u.awsInit(mimeType)
 	if err != nil {
 		return nil, err
+	}
+
+	// Report progress callback with 0 to signal upload is starting
+	if progressFunc, ok := u.ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
+		progressFunc(0)
 	}
 
 	// let's upload
