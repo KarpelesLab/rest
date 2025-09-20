@@ -190,6 +190,10 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 	//log.Printf(ctx, "[rest] Response to %s %s: %s", method, path, body)
 
 	result := &Response{}
+	// Capture X-Request-Id header from HTTP response
+	if reqID := resp.Header.Get("X-Request-Id"); reqID != "" {
+		result.RequestID = reqID
+	}
 	err = pjson.UnmarshalContext(ctx, body, result)
 	if err != nil {
 		if Debug {
@@ -234,6 +238,10 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 				slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
 			}
 			return nil, err
+		}
+		// Capture X-Request-Id header from retry response
+		if reqID := resp.Header.Get("X-Request-Id"); reqID != "" {
+			result.RequestID = reqID
 		}
 	}
 

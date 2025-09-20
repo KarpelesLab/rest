@@ -21,6 +21,9 @@ type Error struct {
 
 // Error returns a string representation of the REST API error.
 func (r *Error) Error() string {
+	if r.Response.RequestID != "" {
+		return fmt.Sprintf("[rest] error from server: %s (X-Request-Id: %s)", r.Response.Error, r.Response.RequestID)
+	}
 	return fmt.Sprintf("[rest] error from server: %s", r.Response.Error)
 }
 

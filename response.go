@@ -32,6 +32,8 @@ type Response struct {
 	RedirectUrl  string `json:"redirect_url,omitempty"`
 	RedirectCode int    `json:"redirect_code,omitempty"`
 
+	RequestID string `json:"-"` // X-Request-Id header from HTTP response
+
 	dataParsed any
 	dataError  error
 	dataParse  sync.Once
