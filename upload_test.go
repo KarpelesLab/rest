@@ -61,7 +61,7 @@ func TestUpload(t *testing.T) {
 func TestUploadPutOnly(t *testing.T) {
 	// For put_only=true, we need a seekable reader to determine the size
 	// Generate 1MB of random data
-	data := make([]byte, 1024*1024)
+	data := make([]byte, 2*1024*1024)
 	if _, err := rand.Read(data); err != nil {
 		t.Fatalf("failed to generate random data: %s", err)
 	}

@@ -83,6 +83,29 @@ type uploadAwsResp struct {
 func SpotUpload(ctx context.Context, client SpotClient, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
+	// Try to determine file size if possible
+	ln := int64(-1)
+	if fs, ok := f.(io.Seeker); ok {
+		var err error
+		ln, err = fs.Seek(0, io.SeekEnd)
+		if err != nil {
+			// seek failed, let's continue in the unknown
+			ln = -1
+		} else {
+			// seek back to the start
+			fs.Seek(0, io.SeekStart)
+			// Add size to params if not already defined and size is known
+			if ln >= 0 {
+				if param == nil {
+					param = make(Param)
+				}
+				if _, hasSize := param["size"]; !hasSize {
+					param["size"] = ln
+				}
+			}
+		}
+	}
+
 	err := SpotApply(ctx, client, req, method, param, &upinfo)
 	if err != nil {
 		return nil, fmt.Errorf("initial upload query failed: %w", err)
@@ -95,24 +118,14 @@ func SpotUpload(ctx context.Context, client SpotClient, req, method string, para
 
 	up.spot = client
 
-	ln := int64(-1)
-
-	if fs, ok := f.(io.Seeker); ok {
-		ln, err = fs.Seek(0, io.SeekEnd)
-		if err != nil {
-			// seek failed, let's continue in the unknown
-			ln = -1
-		} else {
-			// seek back to the start
-			fs.Seek(0, io.SeekStart)
-		}
-	}
-
 	return up.Do(ctx, f, mimeType, ln)
 }
 
 func SpotUploadWriter(ctx context.Context, client SpotClient, req, method string, param Param, mimeType string) (*UploadWriteHandler, error) {
 	var upinfo map[string]any
+
+	// Note: For UploadWriter, we can't determine size in advance since we're providing a writer interface
+	// The caller would need to pass size in params if they know it
 
 	err := SpotApply(ctx, client, req, method, param, &upinfo)
 	if err != nil {
@@ -156,6 +169,29 @@ func SpotUploadWriter(ctx context.Context, client SpotClient, req, method string
 func Upload(ctx context.Context, req, method string, param Param, f io.Reader, mimeType string) (*Response, error) {
 	var upinfo map[string]any
 
+	// Try to determine file size if possible
+	ln := int64(-1)
+	if fs, ok := f.(io.Seeker); ok {
+		var err error
+		ln, err = fs.Seek(0, io.SeekEnd)
+		if err != nil {
+			// seek failed, let's continue in the unknown
+			ln = -1
+		} else {
+			// seek back to the start
+			fs.Seek(0, io.SeekStart)
+			// Add size to params if not already defined and size is known
+			if ln >= 0 {
+				if param == nil {
+					param = make(Param)
+				}
+				if _, hasSize := param["size"]; !hasSize {
+					param["size"] = ln
+				}
+			}
+		}
+	}
+
 	err := Apply(ctx, req, method, param, &upinfo)
 	if err != nil {
 		return nil, fmt.Errorf("initial upload query failed: %w", err)
@@ -166,24 +202,14 @@ func Upload(ctx context.Context, req, method string, param Param, f io.Reader, m
 		return nil, fmt.Errorf("upload prepare failed: %w", err)
 	}
 
-	ln := int64(-1)
-
-	if fs, ok := f.(io.Seeker); ok {
-		ln, err = fs.Seek(0, io.SeekEnd)
-		if err != nil {
-			// seek failed, let's continue in the unknown
-			ln = -1
-		} else {
-			// seek back to the start
-			fs.Seek(0, io.SeekStart)
-		}
-	}
-
 	return up.Do(ctx, f, mimeType, ln)
 }
 
 func UploadWriter(ctx context.Context, req, method string, param Param, mimeType string) (*UploadWriteHandler, error) {
 	var upinfo map[string]any
+
+	// Note: For UploadWriter, we can't determine size in advance since we're providing a writer interface
+	// The caller would need to pass size in params if they know it
 
 	err := Apply(ctx, req, method, param, &upinfo)
 	if err != nil {
@@ -394,6 +420,11 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 	defer resp.Body.Close() // avoid leaking stuff
 	// read full response, discard (ensures upload completed)
 	io.Copy(io.Discard, resp.Body)
+
+	// Check if PUT was successful (200 OK, 201 Created, or 204 No Content are valid)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		return nil, fmt.Errorf("PUT upload failed with status %d", resp.StatusCode)
+	}
 
 	// Report progress if callback is available (entire file uploaded)
 	if progressFunc, ok := ctx.Value(UploadProgress).(UploadProgressFunc); ok && progressFunc != nil {
