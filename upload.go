@@ -423,7 +423,10 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 
 	// Check if PUT was successful (200 OK, 201 Created, or 204 No Content are valid)
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		return nil, fmt.Errorf("PUT upload failed with status %d", resp.StatusCode)
+		// Get X-Request-Id for debugging
+		requestID := resp.Header.Get("X-Request-Id")
+		fmt.Printf("[DEBUG] PUT failed - Status: %d, X-Request-Id: %s, URL: %s\n", resp.StatusCode, requestID, u.put)
+		return nil, fmt.Errorf("PUT upload failed with status %d (X-Request-Id: %s)", resp.StatusCode, requestID)
 	}
 
 	// Report progress if callback is available (entire file uploaded)
