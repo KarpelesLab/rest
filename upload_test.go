@@ -157,6 +157,48 @@ func TestUploadEmptyPutOnly(t *testing.T) {
 	}
 }
 
+// TestUpload65K tests uploading exactly 65536 bytes without put_only
+func TestUpload65K(t *testing.T) {
+	// Generate exactly 65536 bytes of random data
+	data := make([]byte, 65536)
+	if _, err := rand.Read(data); err != nil {
+		t.Fatalf("failed to generate random data: %s", err)
+	}
+
+	// Create a seekable reader
+	input := bytes.NewReader(data)
+
+	// Calculate expected hash
+	hash := sha256.Sum256(data)
+	expectedHash := hex.EncodeToString(hash[:])
+
+	ctx := context.Background()
+	res, err := Upload(ctx, "Misc/Debug:testUpload", "POST", Param{
+		"filename": "test_65k.bin",
+	}, input, "application/octet-stream")
+
+	if err != nil {
+		t.Fatalf("failed to do 65K upload: %s", err)
+	}
+
+	log.Printf("65K upload - expected hash = %s", expectedHash)
+	log.Printf("65K upload - response = %s", res.Data)
+
+	// Verify the SHA256 from the response
+	shaValue, err := res.GetString("SHA256")
+	if err != nil {
+		t.Errorf("Failed to get SHA256 from response: %v", err)
+	} else if shaValue != expectedHash {
+		t.Errorf("Expected SHA256 %s, got %s", expectedHash, shaValue)
+	}
+
+	// Verify we got a Blob__ field in the response
+	blobValue, err := res.GetString("Blob__")
+	if err != nil || blobValue == "" {
+		t.Errorf("Expected Blob__ field in response, got error: %v", err)
+	}
+}
+
 // TestUploadWriter tests the new writer-based upload interface
 func TestUploadWriter(t *testing.T) {
 	// Generate 2MB of random data
