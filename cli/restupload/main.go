@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -57,6 +58,7 @@ var (
 	hostname  = flag.String("hostname", "", "override API hostname (e.g., api.example.com)")
 	method    = flag.String("method", "POST", "HTTP method for the initial API request")
 	cookies   = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
+	insecure  = flag.Bool("insecure", false, "allow insecure SSL connections (skip certificate verification)")
 )
 
 func main() {
@@ -80,6 +82,36 @@ func main() {
 	}
 
 	args := flag.Args()
+
+	// Configure insecure transport if requested
+	if *insecure {
+		// Create a new transport based on the default one but with TLS verification disabled
+		insecureTransport := &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			MaxIdleConns:          100,
+			MaxIdleConnsPerHost:   50,
+			MaxConnsPerHost:       200,
+			IdleConnTimeout:       90 * time.Second,
+			ResponseHeaderTimeout: 90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 5 * time.Second,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+
+		// Replace the global HTTP clients with insecure versions
+		rest.RestHttpClient = &http.Client{
+			Transport: insecureTransport,
+			Timeout:   300 * time.Second,
+		}
+		rest.UploadHttpClient = &http.Client{
+			Transport: insecureTransport,
+			Timeout:   time.Hour,
+		}
+
+		log.Println("WARNING: TLS certificate verification disabled")
+	}
 
 	// Prepare context with hostname override if provided
 	ctx := context.Background()
