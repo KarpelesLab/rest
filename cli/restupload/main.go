@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,14 +28,24 @@ type requestHandler struct {
 	context.Context
 	cookies   string
 	getParams string
+	headers   []string
 }
 
-// Value intercepts *http.Request values to add cookies and GET parameters
+// Value intercepts *http.Request values to add cookies, headers, and GET parameters
 func (rh *requestHandler) Value(key any) any {
 	if req, ok := key.(*http.Request); ok {
 		// Add cookies to the request
 		if rh.cookies != "" {
 			req.Header.Set("Cookie", rh.cookies)
+		}
+		// Add custom headers to the request
+		for _, header := range rh.headers {
+			parts := strings.SplitN(header, ":", 2)
+			if len(parts) == 2 {
+				key := strings.TrimSpace(parts[0])
+				value := strings.TrimSpace(parts[1])
+				req.Header.Set(key, value)
+			}
 		}
 		// Add GET parameters to the URL
 		if rh.getParams != "" {
@@ -50,6 +61,18 @@ func (rh *requestHandler) Value(key any) any {
 	return rh.Context.Value(key)
 }
 
+// headerValues is a custom flag type that collects multiple header values
+type headerValues []string
+
+func (h *headerValues) String() string {
+	return strings.Join(*h, ", ")
+}
+
+func (h *headerValues) Set(value string) error {
+	*h = append(*h, value)
+	return nil
+}
+
 var (
 	api       = flag.String("api", "", "endpoint to direct upload to")
 	params    = flag.String("params", "", "params to pass to the API")
@@ -59,9 +82,11 @@ var (
 	method    = flag.String("method", "POST", "HTTP method for the initial API request")
 	cookies   = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
 	insecure  = flag.Bool("insecure", false, "allow insecure SSL connections (skip certificate verification)")
+	headers   headerValues
 )
 
 func main() {
+	flag.Var(&headers, "header", "custom headers to send with the request (format: \"Header-Name: value\"), can be specified multiple times")
 	flag.Parse()
 	if *api == "" {
 		log.Printf("parameter -api is required")
@@ -123,12 +148,13 @@ func main() {
 		ctx = context.WithValue(ctx, rest.BackendURL, backendURL)
 	}
 
-	// Wrap context with request handler if cookies or GET params are provided
-	if *cookies != "" || *getParams != "" {
+	// Wrap context with request handler if cookies, headers, or GET params are provided
+	if *cookies != "" || *getParams != "" || len(headers) > 0 {
 		ctx = &requestHandler{
 			Context:   ctx,
 			cookies:   *cookies,
 			getParams: *getParams,
+			headers:   headers,
 		}
 	}
 
