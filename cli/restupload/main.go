@@ -82,6 +82,7 @@ var (
 	method    = flag.String("method", "POST", "HTTP method for the initial API request")
 	cookies   = flag.String("cookies", "", "cookies to send with the request (format: name1=value1; name2=value2)")
 	insecure  = flag.Bool("insecure", false, "allow insecure SSL connections (skip certificate verification)")
+	debug     = flag.Bool("debug", false, "enable debug mode for REST API calls")
 	headers   headerValues
 )
 
@@ -92,6 +93,12 @@ func main() {
 		log.Printf("parameter -api is required")
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	// Enable debug mode if requested
+	if *debug {
+		rest.Debug = true
+		log.Println("Debug mode enabled")
 	}
 
 	var p rest.Param = make(map[string]any)
