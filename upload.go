@@ -890,7 +890,15 @@ func (u *UploadInfo) setTag(partNo int, tag string) {
 
 	pos := partNo - 1
 	if pos >= len(u.awstags) {
-		u.awstags = slices.Grow(u.awstags, pos+1-len(u.awstags))[:pos+1]
+		if pos >= cap(u.awstags) {
+			// grow by at least 64 to reduce reallocations
+			grow := pos + 1 - len(u.awstags)
+			if grow < 64 {
+				grow = 64
+			}
+			u.awstags = slices.Grow(u.awstags, grow)
+		}
+		u.awstags = u.awstags[:pos+1]
 	}
 	u.awstags[pos] = tag
 }
