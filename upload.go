@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -888,20 +889,8 @@ func (u *UploadInfo) setTag(partNo int, tag string) {
 	defer u.awstagsLk.Unlock()
 
 	pos := partNo - 1
-
-	if cap(u.awstags) <= pos {
-		// need to increase cap, ensure it's at least pos+1
-		newCap := cap(u.awstags) + 64
-		if newCap <= pos {
-			newCap = pos + 1
-		}
-		tmp := make([]string, len(u.awstags), newCap)
-		copy(tmp, u.awstags)
-		u.awstags = tmp
-	}
-
 	if pos >= len(u.awstags) {
-		u.awstags = u.awstags[:pos+1]
+		u.awstags = slices.Grow(u.awstags, pos+1-len(u.awstags))[:pos+1]
 	}
 	u.awstags[pos] = tag
 }
