@@ -353,11 +353,11 @@ func (u *UploadInfo) parse(req map[string]any) error {
 	if !ok {
 		return nil
 	}
-	u.awsname = bucket["Name"].(string)
+	u.awsname, ok = bucket["Name"].(string)
 	if !ok {
 		return nil
 	}
-	u.awshost = bucket["Host"].(string)
+	u.awshost, ok = bucket["Host"].(string)
 	if !ok {
 		return nil
 	}
@@ -423,9 +423,7 @@ func (u *UploadInfo) Do(ctx context.Context, f io.Reader, mimeType string, ln in
 
 	// Check if PUT was successful (200 OK, 201 Created, or 204 No Content are valid)
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
-		// Get X-Request-Id for debugging
 		requestID := resp.Header.Get("X-Request-Id")
-		fmt.Printf("[DEBUG] PUT failed - Status: %d, X-Request-Id: %s, URL: %s\n", resp.StatusCode, requestID, u.put)
 		return nil, fmt.Errorf("PUT upload failed with status %d (X-Request-Id: %s)", resp.StatusCode, requestID)
 	}
 
@@ -614,6 +612,25 @@ func (u *UploadInfo) partUploadPart(f io.Reader, mimeType string, partNo int, re
 				continue
 			}
 
+			select {
+			case errCh <- err:
+			default:
+			}
+			return
+		}
+
+		// Check if PUT was successful
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			if attempt < maxRetries-1 {
+				delay := baseDelay * time.Duration(1<<uint(attempt))
+				if delay > 30*time.Second {
+					delay = 30 * time.Second
+				}
+				time.Sleep(delay)
+				continue
+			}
+
+			err = fmt.Errorf("part upload failed with status %d", resp.StatusCode)
 			select {
 			case errCh <- err:
 			default:
@@ -873,8 +890,12 @@ func (u *UploadInfo) setTag(partNo int, tag string) {
 	pos := partNo - 1
 
 	if cap(u.awstags) <= pos {
-		// need to increase cap
-		tmp := make([]string, len(u.awstags), cap(u.awstags)+64)
+		// need to increase cap, ensure it's at least pos+1
+		newCap := cap(u.awstags) + 64
+		if newCap <= pos {
+			newCap = pos + 1
+		}
+		tmp := make([]string, len(u.awstags), newCap)
 		copy(tmp, u.awstags)
 		u.awstags = tmp
 	}
