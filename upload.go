@@ -665,8 +665,12 @@ func (u *UploadInfo) awsUpload(f io.Reader, mimeType string, fileSize int64) (*R
 		}
 
 		// Calculate part size to stay under 10,000 parts limit
-		// Part size in MB = fileSize / (10000 * 1024 * 1024)
-		partSize := fileSize / (10000 * 1024 * 1024)
+		// Use ceiling division to ensure we don't exceed the limit
+		// Target 9990 parts to leave safety margin
+		// partSize (in MB) = ceil(fileSize / (9990 * 1MB))
+		const maxParts = int64(9990)
+		const oneMB = int64(1024 * 1024)
+		partSize := (fileSize + maxParts*oneMB - 1) / (maxParts * oneMB)
 		if partSize < 5 {
 			partSize = 5 // Minimum 5MB per part (except last)
 		}
