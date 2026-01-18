@@ -57,6 +57,11 @@ type UploadWriteHandler struct {
 
 var _ io.WriteCloser = &UploadWriteHandler{}
 
+// MinPartSize is the minimum size in MB for each part in AWS S3-style multipart uploads
+// (except for the last part). AWS requires at least 5MB, but this can be increased
+// for better performance on fast connections. Default is 5.
+var MinPartSize int64 = 5
+
 type uploadAuth struct {
 	Authorization string `json:"authorization"`
 }
@@ -671,8 +676,8 @@ func (u *UploadInfo) awsUpload(f io.Reader, mimeType string, fileSize int64) (*R
 		const maxParts = int64(9990)
 		const oneMB = int64(1024 * 1024)
 		partSize := (fileSize + maxParts*oneMB - 1) / (maxParts * oneMB)
-		if partSize < 5 {
-			partSize = 5 // Minimum 5MB per part (except last)
+		if partSize < MinPartSize {
+			partSize = MinPartSize
 		}
 		u.MaxPartSize = partSize
 	}
