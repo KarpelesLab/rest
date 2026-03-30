@@ -40,6 +40,64 @@ jobs:
         file: ./coverage.out
         format: golang
 
+  cross-build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+          - goos: linux
+            goarch: '386'
+          - goos: linux
+            goarch: riscv64
+          - goos: linux
+            goarch: mips64le
+          - goos: linux
+            goarch: ppc64le
+          - goos: linux
+            goarch: s390x
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
+          - goos: openbsd
+            goarch: amd64
+          - goos: openbsd
+            goarch: arm64
+          - goos: netbsd
+            goarch: amd64
+          - goos: netbsd
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          - goos: windows
+            goarch: '386'
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.26'
+
+    - name: Build restupload
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: '0'
+      run: go build -trimpath -ldflags='-s -w' ./cli/restupload
+
   lint:
     runs-on: ubuntu-latest
     steps:
