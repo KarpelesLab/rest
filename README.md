@@ -1,5 +1,6 @@
 [![GoDoc](https://godoc.org/github.com/KarpelesLab/rest?status.svg)](https://godoc.org/github.com/KarpelesLab/rest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/KarpelesLab/rest)](https://goreportcard.com/report/github.com/KarpelesLab/rest)
+[![Coverage Status](https://coveralls.io/repos/github/KarpelesLab/rest/badge.svg?branch=master)](https://coveralls.io/github/KarpelesLab/rest?branch=master)
 
 # KarpelesLab/rest
 
