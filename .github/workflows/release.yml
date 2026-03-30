@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            artifact: restupload-linux-amd64.gz
+          - goos: linux
+            goarch: arm64
+            artifact: restupload-linux-arm64.gz
+          - goos: linux
+            goarch: arm
+            artifact: restupload-linux-arm.gz
+          - goos: linux
+            goarch: '386'
+            artifact: restupload-linux-386.gz
+          - goos: linux
+            goarch: riscv64
+            artifact: restupload-linux-riscv64.gz
+          - goos: linux
+            goarch: mips64le
+            artifact: restupload-linux-mips64le.gz
+          - goos: linux
+            goarch: ppc64le
+            artifact: restupload-linux-ppc64le.gz
+          - goos: linux
+            goarch: s390x
+            artifact: restupload-linux-s390x.gz
+          - goos: darwin
+            goarch: amd64
+            artifact: restupload-darwin-amd64.gz
+          - goos: darwin
+            goarch: arm64
+            artifact: restupload-darwin-arm64.gz
+          - goos: freebsd
+            goarch: amd64
+            artifact: restupload-freebsd-amd64.gz
+          - goos: freebsd
+            goarch: arm64
+            artifact: restupload-freebsd-arm64.gz
+          - goos: openbsd
+            goarch: amd64
+            artifact: restupload-openbsd-amd64.gz
+          - goos: openbsd
+            goarch: arm64
+            artifact: restupload-openbsd-arm64.gz
+          - goos: netbsd
+            goarch: amd64
+            artifact: restupload-netbsd-amd64.gz
+          - goos: netbsd
+            goarch: arm64
+            artifact: restupload-netbsd-arm64.gz
+          - goos: windows
+            goarch: amd64
+            artifact: restupload-windows-amd64.zip
+          - goos: windows
+            goarch: arm64
+            artifact: restupload-windows-arm64.zip
+          - goos: windows
+            goarch: '386'
+            artifact: restupload-windows-386.zip
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up Go
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.26'
+
+    - name: Build
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: '0'
+      run: |
+        if [ "$GOOS" = "windows" ]; then
+          go build -trimpath -ldflags='-s -w' -o restupload.exe ./cli/restupload
+          zip -9 ${{ matrix.artifact }} restupload.exe
+        else
+          go build -trimpath -ldflags='-s -w' -o restupload ./cli/restupload
+          gzip -9 -c restupload > ${{ matrix.artifact }}
+        fi
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.artifact }}
+        path: ${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        merge-multiple: true
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        generate_release_notes: true
+        files: artifacts/*
