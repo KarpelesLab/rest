@@ -221,6 +221,15 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 
 		// re-run query
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
+		// reset body: the first Do(r) consumed r.Body, so retry would otherwise
+		// send Content-Length without any data and fail downstream
+		if r.GetBody != nil {
+			newBody, err := r.GetBody()
+			if err != nil {
+				return nil, fmt.Errorf("failed to reset request body for retry: %w", err)
+			}
+			r.Body = newBody
+		}
 		resp, err := RestHttpClient.Do(r)
 		if err != nil {
 			return nil, err
