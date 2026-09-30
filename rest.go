@@ -102,6 +102,9 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 		},
 		Header: make(http.Header),
 	}
+	// bind the request to ctx, so that cancelling it or its deadline
+	// aborts the query (and the retry after a token renewal)
+	r = r.WithContext(ctx)
 
 	r.Header.Set("Sec-Rest-Http", "false")
 
