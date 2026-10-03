@@ -2,10 +2,9 @@ package rest
 
 import (
 	"context"
+	"encoding/json/v2"
 	"fmt"
 	"log/slog"
-
-	"github.com/KarpelesLab/pjson"
 )
 
 // SpotClient is an interface fulfilled by spotlib.Client that provides
@@ -33,7 +32,7 @@ func SpotApply(ctx context.Context, client SpotClient, path, method string, para
 	if err != nil {
 		return err
 	}
-	err = pjson.UnmarshalContext(ctx, res.Data, target)
+	err = json.Unmarshal(res.Data, target)
 	if Debug && err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
 	}
@@ -57,7 +56,7 @@ func SpotAs[T any](ctx context.Context, client SpotClient, path, method string, 
 	if err != nil {
 		return target, err
 	}
-	err = pjson.UnmarshalContext(ctx, res.Data, &target)
+	err = json.Unmarshal(res.Data, &target)
 	if Debug && err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
 	}
@@ -82,7 +81,7 @@ func SpotDo(ctx context.Context, client SpotClient, path, method string, param a
 		"verb":   method,
 		"params": param,
 	}
-	buf, err := pjson.Marshal(req)
+	buf, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +91,7 @@ func SpotDo(ctx context.Context, client SpotClient, path, method string, param a
 	}
 
 	var resp *Response
-	err = pjson.Unmarshal(respbuf, &resp)
+	err = json.Unmarshal(respbuf, &resp)
 	if err != nil {
 		return nil, err
 	}

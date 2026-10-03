@@ -9,7 +9,7 @@
 ## Code Style Guidelines
 - **Imports**: Use goimports (enforced in Makefile)
 - **Formatting**: Standard Go format
-- **Go Version**: Go 1.21 (toolchain 1.21.3)
+- **Go Version**: Go 1.27 (encoding/json/v2 and jsontext are used throughout; pjson is gone)
 
 ## Naming Conventions
 - PascalCase for exported identifiers

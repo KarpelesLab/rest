@@ -6,7 +6,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/KarpelesLab/pjson"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+
 	"github.com/KarpelesLab/typutil"
 )
 
@@ -16,12 +18,12 @@ type Param map[string]any
 // Response represents a REST API response with standard fields.
 // It handles different result types and provides methods to access response data.
 type Response struct {
-	Result string           `json:"result"` // "success" or "error" (or "redirect")
-	Data   pjson.RawMessage `json:"data,omitempty"`
-	Error  string           `json:"error,omitempty"`
-	Code   int              `json:"code,omitempty"` // for errors
-	Extra  string           `json:"extra,omitempty"`
-	Token  string           `json:"token,omitempty"`
+	Result string         `json:"result"` // "success" or "error" (or "redirect")
+	Data   jsontext.Value `json:"data,omitempty"`
+	Error  string         `json:"error,omitempty"`
+	Code   int            `json:"code,omitzero"` // for errors
+	Extra  string         `json:"extra,omitempty"`
+	Token  string         `json:"token,omitempty"`
 
 	Paging any `json:"paging,omitempty"`
 	Job    any `json:"job,omitempty"`
@@ -135,7 +137,7 @@ func (r *Response) FullRaw() (map[string]any, error) {
 //
 // Returns: an error if unmarshaling fails
 func (r *Response) Apply(v any) error {
-	return pjson.Unmarshal(r.Data, v)
+	return json.Unmarshal(r.Data, v)
 }
 
 // ResponseAs is a generic helper that unmarshals a response into type T.
@@ -160,7 +162,7 @@ func ResponseAs[T any](r *Response) (T, error) {
 //
 // Returns: an error if unmarshaling fails
 func (r *Response) ApplyContext(ctx context.Context, v any) error {
-	return pjson.UnmarshalContext(ctx, r.Data, v)
+	return json.Unmarshal(r.Data, v)
 }
 
 // Value returns the parsed data from the response.
@@ -188,7 +190,7 @@ func (r *Response) ValueContext(ctx context.Context) (any, error) {
 // ParseData parses the JSON data in the response.
 // This is called automatically by Value() and ValueContext() methods.
 func (r *Response) ParseData() {
-	r.dataError = pjson.Unmarshal(r.Data, &r.dataParsed)
+	r.dataError = json.Unmarshal(r.Data, &r.dataParsed)
 }
 
 // Get retrieves a value from the response data by a slash-separated path.

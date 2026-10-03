@@ -6,6 +6,7 @@ package rest
 import (
 	"bytes"
 	"context"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"log/slog"
@@ -13,7 +14,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/KarpelesLab/pjson"
 	"github.com/KarpelesLab/webutil"
 )
 
@@ -43,7 +43,7 @@ func Apply(ctx context.Context, path, method string, param any, target any) erro
 	if err != nil {
 		return err
 	}
-	err = pjson.UnmarshalContext(ctx, res.Data, target)
+	err = json.Unmarshal(res.Data, target)
 	if Debug && err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
 	}
@@ -67,7 +67,7 @@ func As[T any](ctx context.Context, path, method string, param any) (T, error) {
 	if err != nil {
 		return target, err
 	}
-	err = pjson.UnmarshalContext(ctx, res.Data, &target)
+	err = json.Unmarshal(res.Data, &target)
 	if Debug && err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, res.Data), "event", "rest:not_json")
 	}
@@ -119,13 +119,13 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 	switch method {
 	case "GET", "HEAD", "OPTIONS":
 		// need to pass parameters in GET
-		data, err := pjson.MarshalContext(ctx, param)
+		data, err := json.Marshal(param)
 		if err != nil {
 			return nil, err
 		}
 		queryParams.Set("_", string(data))
 	case "PUT", "POST", "PATCH":
-		data, err := pjson.MarshalContext(ctx, param)
+		data, err := json.Marshal(param)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +197,7 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 	if reqID := resp.Header.Get("X-Request-Id"); reqID != "" {
 		result.RequestID = reqID
 	}
-	err = pjson.UnmarshalContext(ctx, body, result)
+	err = json.Unmarshal(body, result)
 	if err != nil {
 		if Debug {
 			slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
@@ -244,7 +244,7 @@ func Do(ctx context.Context, path, method string, param any) (*Response, error) 
 			return nil, err
 		}
 
-		err = pjson.UnmarshalContext(ctx, body, result)
+		err = json.Unmarshal(body, result)
 		if err != nil {
 			if Debug {
 				slog.ErrorContext(ctx, fmt.Sprintf("failed to parse json: %s\n%s", err, body), "event", "rest:not_json")
